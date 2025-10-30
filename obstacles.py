@@ -184,6 +184,19 @@ class ObstacleGenerator:
                     # Hit the side, bottom, or deep inside obstacle - that's a collision
                     return True
         
+        # Also check if player is standing on an obstacle (within 1 pixel above it)
+        # This helps maintain on_ground state even when not actively colliding
+        if not player_is_on_obstacle:
+            for obstacle in self.obstacles:
+                obstacle_rect = obstacle.get_rect()
+                # Check if player is directly above this obstacle
+                if (player_rect.left < obstacle_rect.right and 
+                    player_rect.right > obstacle_rect.left and
+                    abs((player.y + player.height) - obstacle_rect.top) <= 2):
+                    player_is_on_obstacle = True
+                    player.on_ground = True
+                    break
+        
         # If player is not on ground level and not on any obstacle, they're in the air
         if not player_is_on_obstacle and player.y < GROUND_Y - 1:
             player.on_ground = False
