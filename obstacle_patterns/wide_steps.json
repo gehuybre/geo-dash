@@ -1,0 +1,16 @@
+{
+  "name": "Wide Steps",
+  "description": "Very wide platforms for safe landing practice",
+  "obstacles": [
+    {
+      "height": 45,
+      "width": 90,
+      "gap_after": 200
+    },
+    {
+      "height": 65,
+      "width": 90,
+      "gap_after": 200
+    }
+  ]
+}

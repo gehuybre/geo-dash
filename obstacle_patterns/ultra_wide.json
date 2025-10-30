@@ -1,0 +1,16 @@
+{
+  "name": "Ultra Wide Landing",
+  "description": "Very wide platforms for practicing long jumps safely",
+  "obstacles": [
+    {
+      "height": 50,
+      "width": 200,
+      "gap_after": 220
+    },
+    {
+      "height": 50,
+      "width": 200,
+      "gap_after": 350
+    }
+  ]
+}

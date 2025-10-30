@@ -1,0 +1,21 @@
+{
+  "name": "Extreme Ascent",
+  "description": "Steep climb to maximum safe height",
+  "obstacles": [
+    {
+      "height": 50,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 80,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 98,
+      "width": 120,
+      "gap_after": 350
+    }
+  ]
+}

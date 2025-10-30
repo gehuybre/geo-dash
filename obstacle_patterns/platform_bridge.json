@@ -1,0 +1,21 @@
+{
+  "name": "Platform Bridge",
+  "description": "Wide platforms at same height to practice timing",
+  "obstacles": [
+    {
+      "height": 50,
+      "width": 70,
+      "gap_after": 180
+    },
+    {
+      "height": 50,
+      "width": 70,
+      "gap_after": 180
+    },
+    {
+      "height": 50,
+      "width": 70,
+      "gap_after": 300
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Spike Valley",
+  "description": "Tall-short-tall pattern creating a valley effect",
+  "obstacles": [
+    {
+      "height": 60,
+      "width": 60,
+      "gap_after": 200
+    },
+    {
+      "height": 35,
+      "width": 60,
+      "gap_after": 200
+    },
+    {
+      "height": 55,
+      "width": 60,
+      "gap_after": 300
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Sky Tower",
+  "description": "Super tall stacked tower reaching very high",
+  "obstacles": [
+    {
+      "height": 40,
+      "width": 90,
+      "gap_after": 0
+    },
+    {
+      "height": 70,
+      "width": 90,
+      "gap_after": 0
+    },
+    {
+      "height": 95,
+      "width": 90,
+      "gap_after": 300
+    }
+  ]
+}

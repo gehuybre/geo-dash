@@ -1,0 +1,21 @@
+{
+  "name": "Stack Tower",
+  "description": "Stacked blocks creating a climbable tower",
+  "obstacles": [
+    {
+      "height": 30,
+      "width": 80,
+      "gap_after": 0
+    },
+    {
+      "height": 60,
+      "width": 80,
+      "gap_after": 0
+    },
+    {
+      "height": 90,
+      "width": 80,
+      "gap_after": 250
+    }
+  ]
+}

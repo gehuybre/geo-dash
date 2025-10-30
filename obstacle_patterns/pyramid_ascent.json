@@ -1,0 +1,21 @@
+{
+  "name": "Pyramid Ascent",
+  "description": "Pyramid shape with wide platforms getting narrower",
+  "obstacles": [
+    {
+      "height": 35,
+      "width": 150,
+      "gap_after": 0
+    },
+    {
+      "height": 60,
+      "width": 120,
+      "gap_after": 0
+    },
+    {
+      "height": 85,
+      "width": 90,
+      "gap_after": 300
+    }
+  ]
+}

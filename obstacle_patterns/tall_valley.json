@@ -1,0 +1,21 @@
+{
+  "name": "Tall Valley",
+  "description": "Tall obstacles with a gap in between",
+  "obstacles": [
+    {
+      "height": 75,
+      "width": 80,
+      "gap_after": 200
+    },
+    {
+      "height": 45,
+      "width": 100,
+      "gap_after": 200
+    },
+    {
+      "height": 70,
+      "width": 80,
+      "gap_after": 350
+    }
+  ]
+}

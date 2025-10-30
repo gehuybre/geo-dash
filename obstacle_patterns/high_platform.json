@@ -1,0 +1,62 @@
+{
+  "name": "High Platform Challenge",
+  "description": "Very high platforms requiring precise double jumping with 10+ blocks",
+  "obstacles": [
+    {
+      "height": 60,
+      "width": 90,
+      "gap_after": 140
+    },
+    {
+      "height": 68,
+      "width": 90,
+      "gap_after": 140
+    },
+    {
+      "height": 75,
+      "width": 90,
+      "gap_after": 140
+    },
+    {
+      "height": 82,
+      "width": 90,
+      "gap_after": 150
+    },
+    {
+      "height": 88,
+      "width": 90,
+      "gap_after": 150
+    },
+    {
+      "height": 92,
+      "width": 100,
+      "gap_after": 150
+    },
+    {
+      "height": 95,
+      "width": 100,
+      "gap_after": 150
+    },
+    {
+      "height": 90,
+      "width": 100,
+      "gap_after": 150
+    },
+    {
+      "height": 85,
+      "width": 100,
+      "gap_after": 150
+    },
+    {
+      "height": 80,
+      "width": 100,
+      "gap_after": 150
+    },
+    {
+      "height": 75,
+      "width": 100,
+      "gap_after": 300
+    }
+  ]
+}
+

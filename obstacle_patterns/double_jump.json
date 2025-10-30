@@ -1,0 +1,16 @@
+{
+  "name": "Double Jump",
+  "description": "Two obstacles requiring consecutive jumps",
+  "obstacles": [
+    {
+      "height": 60,
+      "width": 30,
+      "gap_after": 160
+    },
+    {
+      "height": 65,
+      "width": 30,
+      "gap_after": 250
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "Mountain Climb",
+  "description": "Large mountain with 10+ stacked blocks requiring multiple jumps to climb",
+  "obstacles": [
+    {
+      "height": 20,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 30,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 40,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 50,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 60,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 70,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 80,
+      "width": 100,
+      "gap_after": 0
+    },
+    {
+      "height": 90,
+      "width": 120,
+      "gap_after": 0
+    },
+    {
+      "height": 85,
+      "width": 120,
+      "gap_after": 0
+    },
+    {
+      "height": 75,
+      "width": 120,
+      "gap_after": 0
+    },
+    {
+      "height": 65,
+      "width": 120,
+      "gap_after": 0
+    },
+    {
+      "height": 55,
+      "width": 120,
+      "gap_after": 250
+    }
+  ]
+}
+

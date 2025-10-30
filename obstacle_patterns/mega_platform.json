@@ -1,0 +1,16 @@
+{
+  "name": "Mega Platform",
+  "description": "Extremely wide safe zone for beginners",
+  "obstacles": [
+    {
+      "height": 45,
+      "width": 250,
+      "gap_after": 180
+    },
+    {
+      "height": 60,
+      "width": 250,
+      "gap_after": 300
+    }
+  ]
+}
