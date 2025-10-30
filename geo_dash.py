@@ -85,7 +85,9 @@ class Game:
         self.renderer.draw_ground()
         self.obstacle_generator.draw(self.screen)
         self.player.draw(self.screen)
-        self.renderer.draw_ui(score, high_score, show_instructions=(score < 5 and not self.game_over))
+        self.renderer.draw_ui(score, high_score, 
+                             show_instructions=(score < 5 and not self.game_over),
+                             current_pattern=self.obstacle_generator.current_pattern_name)
         
         if self.game_over:
             self.renderer.draw_game_over(score)

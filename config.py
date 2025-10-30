@@ -48,5 +48,8 @@ GROUND_SPRITE_PATH = f"{ASSETS_DIR}/ground.png"
 # Visual settings
 BACKGROUND_SCROLL_SPEED_MULTIPLIER = 0.3  # Background scrolls at 30% of player speed (parallax effect)
 
+# Debug settings
+SHOW_PATTERN_DEBUG = True  # Toggle to show/hide current pattern name
+
 # Game settings
 GAME_TITLE = "Cute Geo Dash 🌟"

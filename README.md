@@ -129,13 +129,20 @@ See `assets/README.md` for detailed asset specifications.
 ## 🎲 Game Mechanics
 
 - The player moves automatically from left to right
-- Obstacles are procedurally generated with random heights and gaps
-- **Obstacle patterns** - the game can use predefined patterns (30% chance) or random generation
+- Obstacles use **predefined patterns only** (no random generation)
 - All obstacles are **guaranteed to be jumpable** based on the player's jump physics
 - **Distance-based scoring** - earn 1 point per 100 pixels traveled
 - **High score persistence** - your best score is automatically saved
 - Backgrounds cycle every 5 points with smooth parallax scrolling
 - The game ends when you collide with an obstacle
+
+### 🐛 Debug Mode
+
+The game displays the current pattern name in the top-left corner to help you identify which patterns are fun or too difficult:
+
+- **Toggle debug display**: Edit `config.py` and set `SHOW_PATTERN_DEBUG = False` to hide pattern names
+- Pattern names appear in purple text below the score
+- Use this to track which patterns you enjoy or find challenging!
 
 ## 🎭 Obstacle Patterns
 

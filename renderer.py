@@ -139,7 +139,7 @@ class Renderer:
                            (x, GROUND_Y + PLAYER_SIZE), 
                            (x, GROUND_Y + PLAYER_SIZE - grass_height), 2)
     
-    def draw_ui(self, score, high_score, show_instructions=False):
+    def draw_ui(self, score, high_score, show_instructions=False, current_pattern=None):
         """Draw score and UI elements."""
         if not self.font_available:
             # Draw simple text blocks when font is not available
@@ -147,6 +147,9 @@ class Renderer:
             self._draw_simple_text(f"Best: {high_score}", 10, 50)
             if show_instructions:
                 self._draw_simple_text("Press SPACE to jump!", SCREEN_WIDTH // 2 - 150, 10)
+            # Pattern debug info
+            if SHOW_PATTERN_DEBUG and current_pattern:
+                self._draw_simple_text(f"Pattern: {current_pattern}", 10, 90, color=BLACK)
         else:
             # Score
             score_text = self.font.render(f"Score: {score}", True, BLACK)
@@ -160,6 +163,11 @@ class Renderer:
             if show_instructions:
                 instruction_text = self.font.render("Press SPACE to jump!", True, BLACK)
                 self.screen.blit(instruction_text, (SCREEN_WIDTH // 2 - 150, 10))
+            
+            # Pattern debug info
+            if SHOW_PATTERN_DEBUG and current_pattern:
+                pattern_text = self.font.render(f"Pattern: {current_pattern}", True, BLACK)
+                self.screen.blit(pattern_text, (10, 90))
     
     def _draw_simple_text(self, text, x, y, color=BLACK, size=16):
         """Draw simple pixel text when pygame.font is not available."""

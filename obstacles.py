@@ -64,6 +64,7 @@ class ObstacleGenerator:
     def __init__(self):
         self.obstacles = []
         self.pattern_manager = PatternManager()
+        self.current_pattern_name = None  # Track current pattern for debugging
 
         
     def generate_obstacle(self):
@@ -83,11 +84,11 @@ class ObstacleGenerator:
             spawn_x = SCREEN_WIDTH
         
         if should_spawn:
-            # Decide whether to start a new pattern or random obstacle
-            # Randomly decide to start a new pattern (70% chance)
+            # Use patterns 100% of the time (no random generation)
             pattern = self.pattern_manager.get_random_pattern()
-            if pattern and random.random() < 0.7:
+            if pattern:
                 # Start a new pattern - spawn ALL obstacles at once
+                self.current_pattern_name = pattern.get('name', 'Unknown Pattern')
                 
                 # Calculate initial spawn position
                 if len(self.obstacles) > 0:
@@ -107,23 +108,6 @@ class ObstacleGenerator:
                     
                     # Move x position forward for next obstacle in pattern
                     current_x += width + pattern_obstacle.get('gap_after', 0)
-            else:
-                # Generate random obstacle with varied widths
-                height = random.randint(physics.min_obstacle_height, physics.max_obstacle_height)
-                
-                # Varied width distribution for different playstyles
-                rand = random.random()
-                if rand < 0.1:
-                    width = random.randint(150, 250)  # Very wide platforms (10% chance)
-                elif rand < 0.3:
-                    width = random.randint(80, 120)   # Wide platforms (20% chance)
-                elif rand < 0.5:
-                    width = random.randint(60, 80)    # Medium platforms (20% chance)
-                else:
-                    width = random.randint(25, 45)    # Normal obstacles (50% chance)
-                
-                obstacle = Obstacle(SCREEN_WIDTH, height, width)
-                self.obstacles.append(obstacle)
     
     def update(self):
         """Update all obstacles and generate new ones."""
