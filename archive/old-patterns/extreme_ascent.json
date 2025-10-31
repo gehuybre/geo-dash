@@ -1,0 +1,18 @@
+{
+  "name": "Extreme Ascent",
+  "description": "Steep climb to maximum safe height",
+  "obstacles": [
+    {
+      "bar_type": "bar-3.33-1.56",
+      "gap_type": "gap-stack"
+    },
+    {
+      "bar_type": "bar-3.33-2.5",
+      "gap_type": "gap-stack"
+    },
+    {
+      "bar_type": "bar-4-3",
+      "gap_type": "gap-extreme"
+    }
+  ]
+}

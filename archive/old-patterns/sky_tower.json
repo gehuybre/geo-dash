@@ -1,0 +1,18 @@
+{
+  "name": "Sky Tower",
+  "description": "Super tall stacked tower reaching very high",
+  "obstacles": [
+    {
+      "bar_type": "bar-3-1.25",
+      "gap_type": "gap-stack"
+    },
+    {
+      "bar_type": "bar-3-2.19",
+      "gap_type": "gap-stack"
+    },
+    {
+      "bar_type": "bar-3-2.97",
+      "gap_type": "gap-extreme"
+    }
+  ]
+}

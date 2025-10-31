@@ -1,0 +1,14 @@
+{
+  "name": "Long Bridge",
+  "description": "Extended platform bridge with varied widths and heights",
+  "obstacles": [
+    {"bar_type": "bar-4-5", "gap_type": "gap-2"},
+    {"bar_type": "bar-5-3", "gap_type": "gap-2"},
+    {"bar_type": "bar-6-7", "gap_type": "gap-2"},
+    {"bar_type": "bar-7-4", "gap_type": "gap-2"},
+    {"bar_type": "bar-8-6", "gap_type": "gap-2"},
+    {"bar_type": "bar-7-8", "gap_type": "gap-2"},
+    {"bar_type": "bar-6-5", "gap_type": "gap-2"},
+    {"bar_type": "bar-5-3", "gap_type": "gap-2.5"}
+  ]
+}

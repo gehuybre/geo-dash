@@ -1,0 +1,11 @@
+{
+  "name": "Mini Pyramid",
+  "description": "Small pyramid structure with stacked blocks",
+  "obstacles": [
+    {"bar_type": "bar-3-1", "gap_type": "gap-0"},
+    {"bar_type": "bar-3-2", "gap_type": "gap-0"},
+    {"bar_type": "bar-3-3", "gap_type": "gap-0"},
+    {"bar_type": "bar-3-2", "gap_type": "gap-0"},
+    {"bar_type": "bar-3-1", "gap_type": "gap-2.5"}
+  ]
+}

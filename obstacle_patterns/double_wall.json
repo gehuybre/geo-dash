@@ -1,0 +1,9 @@
+{
+  "name": "Double Wall",
+  "description": "Two wide walls to jump between",
+  "obstacles": [
+    {"bar_type": "bar-2-2", "gap_type": "gap-2"},
+    {"bar_type": "bar-3-1", "gap_type": "gap-2"},
+    {"bar_type": "bar-2-2", "gap_type": "gap-2.5"}
+  ]
+}

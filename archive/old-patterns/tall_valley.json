@@ -1,0 +1,18 @@
+{
+  "name": "Tall Valley",
+  "description": "Tall obstacles with a gap in between",
+  "obstacles": [
+    {
+      "bar_type": "bar-2.67-2.34",
+      "gap_type": "gap-large"
+    },
+    {
+      "bar_type": "bar-3.33-1.41",
+      "gap_type": "gap-large"
+    },
+    {
+      "bar_type": "bar-2.67-2.19",
+      "gap_type": "gap-extreme"
+    }
+  ]
+}

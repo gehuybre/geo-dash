@@ -3,14 +3,12 @@
   "description": "Two obstacles requiring consecutive jumps",
   "obstacles": [
     {
-      "height": 60,
-      "width": 30,
-      "gap_after": 160
+      "bar_type": "bar-1-1.88",
+      "gap_type": "gap-medium"
     },
     {
-      "height": 65,
-      "width": 30,
-      "gap_after": 250
+      "bar_type": "bar-1-2.03",
+      "gap_type": "gap-very-large"
     }
   ]
 }

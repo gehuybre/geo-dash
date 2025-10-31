@@ -1,0 +1,13 @@
+{
+  "name": "Platform Hopper",
+  "description": "Jump across varied width platforms",
+  "obstacles": [
+    {"bar_type": "bar-3-1", "gap_type": "gap-1.5"},
+    {"bar_type": "bar-2-1", "gap_type": "gap-1.5"},
+    {"bar_type": "bar-4-1", "gap_type": "gap-1.5"},
+    {"bar_type": "bar-2-1", "gap_type": "gap-1.5"},
+    {"bar_type": "bar-5-1", "gap_type": "gap-1.5"},
+    {"bar_type": "bar-3-1", "gap_type": "gap-2"},
+    {"bar_type": "bar-6-1", "gap_type": "gap-2.5"}
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "Jump Chain Practice",
+  "description": "Sequence of jumps to practice timing and landing",
+  "obstacles": [
+    {
+      "bar_type": "bar-2.67-1.25",
+      "gap_type": "gap-small"
+    },
+    {
+      "bar_type": "bar-2.67-1.56",
+      "gap_type": "gap-small"
+    },
+    {
+      "bar_type": "bar-2.67-1.88",
+      "gap_type": "gap-small"
+    },
+    {
+      "bar_type": "bar-3.33-2.19",
+      "gap_type": "gap-very-large"
+    }
+  ]
+}

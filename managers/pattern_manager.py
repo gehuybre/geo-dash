@@ -6,6 +6,7 @@ import json
 import os
 from config import GROUND_Y
 from core.physics import physics
+from managers.bar_type_manager import bar_type_manager
 
 
 class PatternManager:
@@ -30,6 +31,8 @@ class PatternManager:
                 try:
                     with open(filepath, 'r') as f:
                         pattern_data = json.load(f)
+                        # Resolve bar_type references to actual dimensions
+                        pattern_data = self._resolve_bar_types(pattern_data)
                         # Validate pattern
                         if 'obstacles' in pattern_data and isinstance(pattern_data['obstacles'], list):
                             # Validate pattern is physically possible
@@ -44,6 +47,61 @@ class PatternManager:
                     print(f"✗ Failed to load pattern {filename}: {e}")
         
         return patterns
+    
+    def _resolve_bar_types(self, pattern_data):
+        """
+        Resolve bar_type and gap_type references to actual width/height/gap values.
+        Supports both legacy format (explicit width/height/gap_after) and new format (bar_type/gap_type).
+        """
+        obstacles = pattern_data.get('obstacles', [])
+        resolved_obstacles = []
+        
+        for obs in obstacles:
+            resolved_obs = obs.copy()
+            
+            # Check if this obstacle uses bar_type reference
+            if 'bar_type' in obs:
+                bar_type = obs['bar_type']
+                dimensions = bar_type_manager.get_bar_dimensions(bar_type)
+                
+                if dimensions:
+                    width, height = dimensions
+                    # Only override if not explicitly set
+                    if 'width' not in obs:
+                        resolved_obs['width'] = width
+                    if 'height' not in obs:
+                        resolved_obs['height'] = height
+                else:
+                    # Bar type not found, use defaults
+                    if 'width' not in obs:
+                        resolved_obs['width'] = 30
+                    if 'height' not in obs:
+                        resolved_obs['height'] = 30
+            
+            # Check if this obstacle uses gap_type reference
+            if 'gap_type' in obs:
+                gap_type = obs['gap_type']
+                gap_distance = bar_type_manager.get_gap_distance(gap_type)
+                
+                if gap_distance is not None:
+                    # Only override if not explicitly set
+                    if 'gap_after' not in obs:
+                        resolved_obs['gap_after'] = gap_distance
+                else:
+                    # Gap type not found, use default
+                    if 'gap_after' not in obs:
+                        resolved_obs['gap_after'] = 200
+            
+            # Ensure width and height exist (for legacy patterns)
+            if 'width' not in resolved_obs:
+                resolved_obs['width'] = 30
+            if 'height' not in resolved_obs:
+                resolved_obs['height'] = 30
+            
+            resolved_obstacles.append(resolved_obs)
+        
+        pattern_data['obstacles'] = resolved_obstacles
+        return pattern_data
     
     def _validate_pattern(self, pattern_data):
         """Validate that a pattern is physically possible to complete with jump sequences."""

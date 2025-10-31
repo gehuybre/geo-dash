@@ -3,14 +3,12 @@
   "description": "Extremely wide safe zone for beginners",
   "obstacles": [
     {
-      "height": 45,
-      "width": 250,
-      "gap_after": 180
+      "bar_type": "bar-8.33-1.41",
+      "gap_type": "gap-medium"
     },
     {
-      "height": 60,
-      "width": 250,
-      "gap_after": 300
+      "bar_type": "bar-8.33-1.88",
+      "gap_type": "gap-extreme"
     }
   ]
 }
