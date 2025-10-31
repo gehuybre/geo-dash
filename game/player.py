@@ -7,6 +7,51 @@ import math
 from .config import *
 
 
+class ScorePopup:
+    """Floating score text that appears when landing on platforms."""
+    
+    def __init__(self, x, y, points):
+        self.x = x
+        self.y = y
+        self.points = points
+        self.lifetime = 60  # Frames to live
+        self.age = 0
+        self.velocity_y = -2  # Float upward
+    
+    def update(self):
+        """Update popup position and age."""
+        self.age += 1
+        self.y += self.velocity_y
+        self.velocity_y += 0.05  # Slight gravity
+        return self.age < self.lifetime
+    
+    def draw(self, screen):
+        """Draw the floating score text."""
+        # Fade out over time
+        alpha = int(255 * (1 - self.age / self.lifetime))
+        
+        # Create text surface
+        text = f"+{self.points}"
+        font_size = 36 if self.points > 5 else 24
+        
+        # Try to use pygame font
+        try:
+            font = pygame.font.SysFont('Comic Sans MS', font_size, bold=True)
+            text_surface = font.render(text, True, YELLOW)
+            text_surface.set_alpha(alpha)
+            
+            # Draw shadow
+            shadow = font.render(text, True, BLACK)
+            shadow.set_alpha(alpha // 2)
+            screen.blit(shadow, (self.x + 2, self.y + 2))
+            
+            # Draw main text
+            screen.blit(text_surface, (self.x, self.y))
+        except:
+            # Fallback to simple rendering
+            pass
+
+
 class Player:
     """Player character with physics and rendering."""
     
@@ -24,6 +69,11 @@ class Player:
         self.rotation = 0
         self.has_double_jump = False  # Can use double jump
         self.jumps_used = 0  # Track number of jumps (0, 1, or 2)
+        
+        # Landing bonus and combo system
+        self.just_landed = False  # Flag for landing bonus
+        self.combo_streak = 0  # Number of consecutive platform landings without touching ground
+        self.last_landed_on_ground = True  # Track if last landing was on ground
         
         # Try to load custom sprite
         self.custom_sprite = asset_manager.get_player_sprite()
@@ -48,6 +98,9 @@ class Player:
         # Don't reset on_ground here - let collision detection handle it
         # This prevents flickering when standing on obstacles
         
+        # Reset just_landed flag (will be set by collision if landing)
+        self.just_landed = False
+        
         # Apply gravity
         self.velocity_y += GRAVITY
         self.y += self.velocity_y
@@ -61,6 +114,11 @@ class Player:
             self.jumps_used = 0  # Reset jumps when on ground
             self.has_double_jump = False
             self.rotation = 0
+            
+            # Reset combo when landing on ground
+            if not self.last_landed_on_ground:
+                self.combo_streak = 0
+                self.last_landed_on_ground = True
         elif self.velocity_y > 0:
             # If falling and not on ground level, assume in air (will be corrected by collision)
             # Only set to False if actually falling, not if standing on obstacle

@@ -21,16 +21,14 @@ class Obstacle:
         self.hazard_type = hazard_type  # "lava" or "acid"
         self.continuous_lava = continuous_lava  # If True, extend to viewport bottom
         
-        # Hazard floors are very low bars (15px tall) or full-height if continuous
+        # Hazard floors always fill from grass to bottom for visual consistency  
         if is_killzone:
             self.width = width
-            if continuous_lava:
-                # Full height from ground to bottom of viewport (720px total viewport)
-                self.height = 720 - (GROUND_Y + PLAYER_SIZE - 15)  # From just above grass to bottom
-                self.y = GROUND_Y + PLAYER_SIZE - 15  # Start just above grass
-            else:
-                self.height = 15  # Very low bar
-                self.y = GROUND_Y + PLAYER_SIZE - self.height  # Just above ground level
+            # Lava fills from just above grass line to ensure collision with walking player
+            # Player bottom is at GROUND_Y + PLAYER_SIZE when walking
+            # Start lava slightly higher to ensure overlap
+            self.y = GROUND_Y + PLAYER_SIZE - 5  # Start 5px above grass line for collision
+            self.height = SCREEN_HEIGHT - self.y  # Extend to bottom of screen
             self.y_offset = 0  # Sits on ground
             self.custom_sprite = None
             self.hazard_texture = asset_manager.get_hazard_texture(hazard_type)
@@ -44,10 +42,29 @@ class Obstacle:
             self.hazard_texture = None
         
         self.passed = False
+        
+        # Landing visual effects for platforms/bars
+        self.landing_squish = 0  # 0-1, amount of squish effect
+        self.landing_glow = 0  # 0-255, glow intensity
+        self.landing_blink = 0  # Counter for blink effect
     
     def update(self):
-        """Move obstacle left."""
+        """Move obstacle left and update visual effects."""
         self.x -= PLAYER_SPEED
+        
+        # Decay landing effects
+        if self.landing_squish > 0:
+            self.landing_squish *= 0.85
+        if self.landing_glow > 0:
+            self.landing_glow *= 0.9
+        if self.landing_blink > 0:
+            self.landing_blink -= 1
+    
+    def trigger_landing_effect(self):
+        """Trigger visual landing effects when player lands on this obstacle."""
+        self.landing_squish = 0.25  # Start at 25% squish
+        self.landing_glow = 180  # Bright glow
+        self.landing_blink = 6  # Blink for 6 frames
     
     def get_rect(self):
         """Get collision rectangle."""
@@ -63,20 +80,41 @@ class Obstacle:
             self._draw_procedural(screen)
     
     def _draw_procedural(self, screen):
-        """Draw using procedural generation (gradient purple block)."""
+        """Draw using procedural generation (gradient purple block) with landing effects."""
+        # Calculate squish dimensions
+        squish_factor = 1 - (self.landing_squish * 0.4)  # Max 10% height reduction
+        squish_height = int(self.height * squish_factor)
+        squish_y_offset = self.height - squish_height
+        
+        # Draw glow effect if active
+        if self.landing_glow > 20:
+            glow_size = 8
+            for i in range(3):
+                glow_alpha = int(self.landing_glow * (1 - i * 0.3))
+                glow_surface = pygame.Surface((self.width + glow_size*2, squish_height + glow_size*2), pygame.SRCALPHA)
+                color = (255, 255, 100, glow_alpha)  # Yellow glow
+                pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
+                screen.blit(glow_surface, (self.x - glow_size, self.y + squish_y_offset - glow_size))
+        
         # Draw cute obstacle with gradient effect
-        for i in range(self.height):
-            color_intensity = 216 - (i * 20 // self.height)
-            color = (color_intensity, 191 - (i * 10 // self.height), 216)
-            pygame.draw.rect(screen, color, (self.x, self.y + i, self.width, 1))
+        for i in range(squish_height):
+            color_intensity = 216 - (i * 20 // squish_height)
+            color = (color_intensity, 191 - (i * 10 // squish_height), 216)
+            pygame.draw.rect(screen, color, (self.x, self.y + squish_y_offset + i, self.width, 1))
+        
+        # Blink effect - brighter color
+        if self.landing_blink > 0 and self.landing_blink % 2 == 0:
+            blink_surface = pygame.Surface((self.width, squish_height), pygame.SRCALPHA)
+            blink_surface.fill((255, 255, 150, 100))  # Yellow tint
+            screen.blit(blink_surface, (self.x, self.y + squish_y_offset))
         
         # Outline
-        pygame.draw.rect(screen, OBSTACLE_DARK, (self.x, self.y, self.width, self.height), 2, border_radius=5)
+        pygame.draw.rect(screen, OBSTACLE_DARK, (self.x, self.y + squish_y_offset, self.width, squish_height), 2, border_radius=5)
         
         # Add sparkles (only if obstacle is tall enough)
-        if self.height >= 20 and random.random() < 0.1:
+        if squish_height >= 20 and random.random() < 0.1:
             star_x = self.x + random.randint(5, max(6, self.width - 5))
-            star_y = self.y + random.randint(5, max(6, self.height - 5))
+            star_y = self.y + squish_y_offset + random.randint(5, max(6, squish_height - 5))
             pygame.draw.circle(screen, YELLOW, (star_x, star_y), 2)
     
     def _draw_hazard_bar(self, screen):
@@ -272,6 +310,14 @@ class ObstacleGenerator:
                     player.jumps_used = 0  # Reset double jump on landing
                     player.has_double_jump = False
                     player.rotation = 0  # Stop rotation when on obstacle
+                    
+                    # Trigger landing visual effects on the OBSTACLE (only if just landed)
+                    if not player_is_on_obstacle:  # First landing on this obstacle
+                        obstacle.trigger_landing_effect()
+                        player.just_landed = True  # Flag for scoring bonus
+                        player.combo_streak += 1  # Increase combo for platform landing
+                        player.last_landed_on_ground = False
+                    
                     player_is_on_obstacle = True
                     # No collision, just landing
                     continue

@@ -17,15 +17,35 @@ class Renderer:
         
         self.screen = screen
         
-        # Try to initialize fonts, handle pygame 2.6.1 + Python 3.14 bug
+        # Try to initialize fonts with cute, rounded fonts
+        # Using SysFont instead of Font to avoid pygame 2.6.1 + Python 3.14 circular import bug
         try:
-            self.font = pygame.font.Font(None, 36)
-            self.big_font = pygame.font.Font(None, 72)
+            # Try cute/rounded fonts first, fallback to system default
+            cute_fonts = ['Comic Sans MS', 'Chalkboard', 'Marker Felt', 'Bradley Hand', 'Arial Rounded MT Bold']
+            self.font = None
+            self.big_font = None
+            
+            for font_name in cute_fonts:
+                try:
+                    self.font = pygame.font.SysFont(font_name, 36)
+                    self.big_font = pygame.font.SysFont(font_name, 72)
+                    if self.font and self.big_font:
+                        print(f"✓ Using font: {font_name}")
+                        break
+                except:
+                    continue
+            
+            # If no cute fonts found, use default
+            if not self.font:
+                self.font = pygame.font.SysFont(None, 36)
+                self.big_font = pygame.font.SysFont(None, 72)
+                print("✓ Using default system font")
+            
             self.font_available = True
-        except (NotImplementedError, ImportError):
-            # Font module not available in pygame 2.6.1 with Python 3.14
+        except (NotImplementedError, ImportError) as e:
+            # Font module not available
             self.font_available = False
-            print("Warning: pygame.font not available, using basic text rendering")
+            print(f"Warning: pygame.font not available ({e}), using basic text rendering")
         
         # Try to load custom background
         self.backgrounds = asset_manager.get_background_images()
@@ -139,25 +159,38 @@ class Renderer:
                            (x, GROUND_Y + PLAYER_SIZE), 
                            (x, GROUND_Y + PLAYER_SIZE - grass_height), 2)
     
-    def draw_ui(self, score, high_score, show_instructions=False, current_pattern=None):
+    def draw_ui(self, score, high_score, show_instructions=False, current_pattern=None, player_name=None):
         """Draw score and UI elements."""
         if not self.font_available:
             # Draw simple text blocks when font is not available
-            self._draw_simple_text(f"Score: {score}", 10, 10)
-            self._draw_simple_text(f"Best: {high_score}", 10, 50)
+            if player_name:
+                self._draw_simple_text(f"Player: {player_name}", 10, 10)
+                self._draw_simple_text(f"Score: {score}", 10, 35)
+                self._draw_simple_text(f"Best: {high_score}", 10, 60)
+            else:
+                self._draw_simple_text(f"Score: {score}", 10, 10)
+                self._draw_simple_text(f"Best: {high_score}", 10, 50)
             if show_instructions:
                 self._draw_simple_text("Press SPACE to jump!", SCREEN_WIDTH // 2 - 150, 10)
             # Pattern debug info
             if SHOW_PATTERN_DEBUG and current_pattern:
                 self._draw_simple_text(f"Pattern: {current_pattern}", 10, 90, color=BLACK)
         else:
+            # Player name (if provided)
+            y_offset = 10
+            if player_name:
+                player_text = self.font.render(f"🎮 {player_name}", True, HEART_RED)
+                self.screen.blit(player_text, (10, y_offset))
+                y_offset += 35
+            
             # Score
             score_text = self.font.render(f"Score: {score}", True, BLACK)
-            self.screen.blit(score_text, (10, 10))
+            self.screen.blit(score_text, (10, y_offset))
+            y_offset += 35
             
             # High score
             high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
-            self.screen.blit(high_score_text, (10, 50))
+            self.screen.blit(high_score_text, (10, y_offset))
             
             # Instructions
             if show_instructions:
@@ -259,3 +292,54 @@ class Renderer:
             restart_text = self.font.render("Press SPACE to restart", True, YELLOW)
             restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 70))
             self.screen.blit(restart_text, restart_rect)
+    
+    def draw_pause_menu(self, selected_option):
+        """Draw pause menu with options: Resume, Restart, Select Difficulty, Main Menu."""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        menu_options = ["Resume", "Restart", "Select Difficulty", "Main Menu"]
+        
+        if not self.font_available:
+            # Simple fallback rendering
+            self._draw_simple_text("PAUSED", SCREEN_WIDTH // 2 - 60, 150, YELLOW, 24)
+            
+            for i, option in enumerate(menu_options):
+                y = 250 + i * 60
+                color = HEART_RED if i == selected_option else WHITE
+                prefix = "> " if i == selected_option else "  "
+                self._draw_simple_text(f"{prefix}{option}", SCREEN_WIDTH // 2 - 120, y, color, 18)
+            
+            self._draw_simple_text("Use Arrow Keys + SPACE", SCREEN_WIDTH // 2 - 140, 500, SKY_LIGHT, 14)
+        else:
+            # Pause title
+            pause_text = self.big_font.render("⏸ PAUSED", True, YELLOW)
+            pause_rect = pause_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
+            self.screen.blit(pause_text, pause_rect)
+            
+            # Menu options
+            for i, option in enumerate(menu_options):
+                y = 250 + i * 60
+                
+                # Highlight selected option
+                if i == selected_option:
+                    color = HEART_RED
+                    # Draw selection background
+                    bg_rect = pygame.Rect(SCREEN_WIDTH // 2 - 150, y - 10, 300, 50)
+                    pygame.draw.rect(self.screen, (255, 200, 200, 100), bg_rect, border_radius=10)
+                    pygame.draw.rect(self.screen, HEART_RED, bg_rect, 3, border_radius=10)
+                    option_text = self.font.render(f"▸ {option}", True, color)
+                else:
+                    color = WHITE
+                    option_text = self.font.render(option, True, color)
+                
+                option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, y + 10))
+                self.screen.blit(option_text, option_rect)
+            
+            # Controls hint
+            hint_text = self.font.render("Use ↑↓ Arrow Keys + SPACE or ESC to Resume", True, SKY_LIGHT)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+            self.screen.blit(hint_text, hint_rect)
