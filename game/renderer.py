@@ -278,44 +278,72 @@ class Renderer:
                                             y + row * pixel_size, 
                                             pixel_size, pixel_size))
     
-    def draw_game_over(self, score):
-        """Draw game over screen."""
+    def draw_game_over(self, score, selected_option=0):
+        """Draw game over screen with menu options."""
         # Semi-transparent overlay
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(128)
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
         
+        menu_options = ["Restart", "Switch Player"]
+        
         if not self.font_available:
             # Simple fallback rendering
-            self._draw_simple_text("Game Over!", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 50, HEART_RED, 24)
-            self._draw_simple_text(f"Final Score: {score}", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 20, WHITE, 18)
-            self._draw_simple_text("Press SPACE to restart", SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 + 70, YELLOW, 18)
+            self._draw_simple_text("Game Over!", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 100, HEART_RED, 24)
+            self._draw_simple_text(f"Final Score: {score}", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 40, WHITE, 18)
+            
+            for i, option in enumerate(menu_options):
+                y = SCREEN_HEIGHT // 2 + 20 + i * 50
+                color = YELLOW if i == selected_option else WHITE
+                prefix = "> " if i == selected_option else "  "
+                self._draw_simple_text(f"{prefix}{option}", SCREEN_WIDTH // 2 - 80, y, color, 18)
+            
+            self._draw_simple_text("Use Arrow Keys + SPACE", SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 + 150, SKY_LIGHT, 14)
         else:
             # Game Over text
             game_over_text = self.big_font.render("Game Over! 💫", True, HEART_RED)
-            text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+            text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100))
             self.screen.blit(game_over_text, text_rect)
             
             # Final score
             score_text = self.font.render(f"Final Score: {score}", True, WHITE)
-            score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+            score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
             self.screen.blit(score_text, score_rect)
             
-            # Restart instruction
-            restart_text = self.font.render("Press SPACE to restart", True, YELLOW)
-            restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 70))
-            self.screen.blit(restart_text, restart_rect)
+            # Menu options
+            for i, option in enumerate(menu_options):
+                y = SCREEN_HEIGHT // 2 + 20 + i * 60
+                
+                # Highlight selected option
+                if i == selected_option:
+                    color = YELLOW
+                    # Draw selection background
+                    bg_rect = pygame.Rect(SCREEN_WIDTH // 2 - 120, y - 10, 240, 50)
+                    pygame.draw.rect(self.screen, (255, 255, 100, 100), bg_rect, border_radius=10)
+                    pygame.draw.rect(self.screen, YELLOW, bg_rect, 3, border_radius=10)
+                    option_text = self.font.render(f"▸ {option}", True, color)
+                else:
+                    color = WHITE
+                    option_text = self.font.render(option, True, color)
+                
+                option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, y + 10))
+                self.screen.blit(option_text, option_rect)
+            
+            # Instructions
+            hint_text = self.font.render("↑/↓ to select, SPACE to confirm", True, SKY_LIGHT)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 170))
+            self.screen.blit(hint_text, hint_rect)
     
     def draw_pause_menu(self, selected_option):
-        """Draw pause menu with options: Resume, Restart, Select Difficulty, Main Menu."""
+        """Draw pause menu with options: Resume, Restart, Switch Player, Select Difficulty, Main Menu."""
         # Semi-transparent overlay
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(180)
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
         
-        menu_options = ["Resume", "Restart", "Select Difficulty", "Main Menu"]
+        menu_options = ["Resume", "Restart", "Switch Player", "Select Difficulty", "Main Menu"]
         
         if not self.font_available:
             # Simple fallback rendering

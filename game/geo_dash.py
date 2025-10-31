@@ -43,7 +43,8 @@ class Game:
         self.running = True
         self.game_over = False
         self.paused = False
-        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Difficulty, 3=Main Menu
+        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Switch Player, 3=Difficulty, 4=Main Menu
+        self.game_over_menu_option = 0  # 0=Restart, 1=Switch Player
         self.difficulty = None  # Will be set by menu
         self.player_name = None  # Will be set by name selection
         
@@ -318,9 +319,9 @@ class Game:
         if self.paused:
             # Navigate pause menu
             if self.input_handler.is_up_pressed():
-                self.pause_menu_option = (self.pause_menu_option - 1) % 4
+                self.pause_menu_option = (self.pause_menu_option - 1) % 5  # 5 options now
             elif self.input_handler.is_down_pressed():
-                self.pause_menu_option = (self.pause_menu_option + 1) % 4
+                self.pause_menu_option = (self.pause_menu_option + 1) % 5  # 5 options now
             elif self.input_handler.is_select_pressed():
                 self.handle_pause_menu_selection()
         elif not self.game_over:
@@ -328,11 +329,24 @@ class Game:
             if self.input_handler.is_jump_pressed():
                 self.player.jump()
         else:
-            # Game over - restart on space
-            if self.input_handler.is_jump_pressed():
-                self.reset_game()
+            # Game over menu navigation
+            if self.input_handler.is_up_pressed():
+                self.game_over_menu_option = (self.game_over_menu_option - 1) % 2  # 2 options
+            elif self.input_handler.is_down_pressed():
+                self.game_over_menu_option = (self.game_over_menu_option + 1) % 2  # 2 options
+            elif self.input_handler.is_select_pressed() or self.input_handler.is_jump_pressed():
+                self.handle_game_over_selection()
         
         if self.input_handler.is_restart_pressed():
+            self.reset_game()
+    
+    def handle_game_over_selection(self):
+        """Handle game over menu selection."""
+        if self.game_over_menu_option == 0:  # Restart
+            self.reset_game()
+        elif self.game_over_menu_option == 1:  # Switch Player
+            self.player_name = self.show_name_selection()
+            self.score_manager = ScoreManager(player_name=self.player_name)
             self.reset_game()
     
     def handle_pause_menu_selection(self):
@@ -342,12 +356,19 @@ class Game:
         elif self.pause_menu_option == 1:  # Restart
             self.reset_game()
             self.paused = False
-        elif self.pause_menu_option == 2:  # Select Difficulty
+        elif self.pause_menu_option == 2:  # Switch Player
+            self.paused = False
+            self.player_name = self.show_name_selection()
+            self.score_manager = ScoreManager(player_name=self.player_name)
+            self.reset_game()
+        elif self.pause_menu_option == 3:  # Select Difficulty
             self.paused = False
             self.difficulty = self.show_difficulty_menu()
             self.reset_game()
-        elif self.pause_menu_option == 3:  # Main Menu (restart with difficulty select)
+        elif self.pause_menu_option == 4:  # Main Menu (restart with everything)
             self.paused = False
+            self.player_name = self.show_name_selection()
+            self.score_manager = ScoreManager(player_name=self.player_name)
             self.difficulty = self.show_difficulty_menu()
             self.reset_game()
 
@@ -431,7 +452,7 @@ class Game:
         if self.paused:
             self.renderer.draw_pause_menu(self.pause_menu_option)
         elif self.game_over:
-            self.renderer.draw_game_over(score)
+            self.renderer.draw_game_over(score, self.game_over_menu_option)
         
         pygame.display.flip()
     
