@@ -376,7 +376,14 @@ class Game:
             # Update distance and score
             self.score_manager.update_distance(PLAYER_SPEED)
             
+            # Check collision FIRST - this sets the just_landed flag
+            if self.obstacle_generator.check_collision(self.player):
+                self.game_over = True
+                self.score_manager.check_and_save_high_score()
+                return  # Exit early if game over
+            
             # Award landing bonus if player just landed (with combo multiplier)
+            # This check happens AFTER collision detection so the flag is set
             if self.player.just_landed:
                 bonus_points = self.score_manager.add_landing_bonus(self.player.combo_streak)
                 
@@ -402,11 +409,6 @@ class Game:
             
             # Update visual effects
             self.effects.update()
-            
-            # Check collision
-            if self.obstacle_generator.check_collision(self.player):
-                self.game_over = True
-                self.score_manager.check_and_save_high_score()
     
     def draw(self):
         """Draw all game elements."""

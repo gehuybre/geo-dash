@@ -30,7 +30,7 @@ JUMP_POWER = -15
 # Player settings
 GROUND_Y = 650  # Lower horizon for bigger window (was 450)
 PLAYER_SIZE = 40
-PLAYER_START_X = 100
+PLAYER_START_X = 300  # Moved right for better camera position (was 100)
 
 # Obstacle generation settings
 MIN_OBSTACLE_GAP = 200
