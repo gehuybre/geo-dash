@@ -28,7 +28,7 @@ PLAYER_SPEED = 6
 JUMP_POWER = -15
 
 # Player settings
-GROUND_Y = 450
+GROUND_Y = 650  # Lower horizon for bigger window (was 450)
 PLAYER_SIZE = 40
 PLAYER_START_X = 100
 
