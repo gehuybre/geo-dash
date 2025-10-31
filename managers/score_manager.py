@@ -97,12 +97,16 @@ class ScoreManager:
         return bonus  # Return actual bonus awarded for UI display
     
     def check_and_save_high_score(self):
-        """Check if current score is a high score and save if it is."""
+        """Check if current score is a high score and save if it is.
+        Always saves the player to ensure they appear in the player list."""
+        is_new_high_score = False
         if self.score > self.high_score:
             self.high_score = self.score
-            self.save_high_score()
-            return True
-        return False
+            is_new_high_score = True
+        
+        # Always save to ensure player is in the list, even with score 0
+        self.save_high_score()
+        return is_new_high_score
     
     def reset(self):
         """Reset current game scores (keeps high score)."""

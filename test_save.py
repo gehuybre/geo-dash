@@ -65,3 +65,16 @@ for name, score in final_players:
     print(f"  {name}: {score}")
 
 print("\n=== All Tests Complete ===")
+
+# Test 8: Player with score 0 (dies immediately)
+print("\nBonus Test: New player with score 0")
+zero_player = ScoreManager(player_name="ZeroScore")
+# Don't add any points, just save
+zero_player.check_and_save_high_score()
+print(f"  Saved ZeroScore with score: {zero_player.score}")
+
+# Verify they're in the list
+sm_bonus = ScoreManager()
+bonus_players = sm_bonus.get_all_players()
+zero_found = any(name == "ZeroScore" for name, score in bonus_players)
+print(f"  ZeroScore in player list: {zero_found}")
