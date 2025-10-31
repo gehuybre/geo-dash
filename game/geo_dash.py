@@ -11,6 +11,7 @@ pygame.init()
 from .config import *
 from .player import Player
 from .obstacles import ObstacleGenerator
+from .visual_effects import VisualEffectsManager
 from managers.score_manager import ScoreManager
 from systems.input_handler import InputHandler
 
@@ -45,8 +46,8 @@ class Game:
         self.score_manager = ScoreManager(player_name=self.player_name)
         self.input_handler = InputHandler()
         
-        # Score popups
-        self.score_popups = []
+        # Visual effects manager
+        self.effects = VisualEffectsManager()
     
     def show_name_selection(self):
         """Show player name selection menu and return selected/entered name."""
@@ -346,11 +347,14 @@ class Game:
         self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
         self.renderer = Renderer(self.screen)
         self.score_manager.reset()
-        self.score_popups = []  # Clear score popups
+        self.effects.clear()  # Clear all visual effects
     
     def update(self):
         """Update game state."""
         if not self.game_over and not self.paused:
+            # Track previous combo for comparison
+            previous_combo = self.player.combo_streak
+            
             self.player.update()
             self.obstacle_generator.update()
             self.renderer.update()  # Update background scrolling
@@ -360,18 +364,30 @@ class Game:
             
             # Award landing bonus if player just landed (with combo multiplier)
             if self.player.just_landed:
-                from .player import ScorePopup
                 bonus_points = self.score_manager.add_landing_bonus(self.player.combo_streak)
-                # Create floating score popup
-                popup = ScorePopup(
-                    self.player.x + self.player.width // 2 - 10,
+                
+                # Create floating combo number popup
+                self.effects.add_score_popup(
+                    self.player.x + self.player.width // 2,
                     self.player.y - 20,
-                    bonus_points
+                    bonus_points,
+                    self.player.combo_streak
                 )
-                self.score_popups.append(popup)
+                
+                # Show streak indicator for combos of 3+
+                if self.player.combo_streak >= 3:
+                    self.effects.add_streak_indicator(self.player.combo_streak)
             
-            # Update score popups
-            self.score_popups = [popup for popup in self.score_popups if popup.update()]
+            # Check if streak was broken (combo went from high to 0)
+            if previous_combo >= 3 and self.player.combo_streak == 0:
+                self.effects.add_streak_broken(
+                    self.player.x + self.player.width // 2,
+                    self.player.y - 40,
+                    previous_combo
+                )
+            
+            # Update visual effects
+            self.effects.update()
             
             # Check collision
             if self.obstacle_generator.check_collision(self.player):
@@ -388,9 +404,8 @@ class Game:
         self.obstacle_generator.draw(self.screen)  # Then obstacles (including lava) on top
         self.player.draw(self.screen)  # Player on top of everything
         
-        # Draw score popups
-        for popup in self.score_popups:
-            popup.draw(self.screen)
+        # Draw all visual effects (popups, streaks, particles)
+        self.effects.draw(self.screen)
         
         self.renderer.draw_ui(score, high_score, 
                              show_instructions=(score < 5 and not self.game_over and not self.paused),
