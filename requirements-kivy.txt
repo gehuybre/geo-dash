@@ -1,0 +1,6 @@
+# Kivy requirements for iOS build
+kivy==2.3.0
+pillow>=10.0.0
+
+# Note: buildozer will handle iOS-specific dependencies
+# This file is for documentation and local testing
