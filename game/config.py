@@ -45,6 +45,11 @@ OBSTACLE_SPRITE_PATH = f"{ASSETS_DIR}/obstacle.png"
 BACKGROUND_PATH = f"{ASSETS_DIR}/background.png"
 GROUND_SPRITE_PATH = f"{ASSETS_DIR}/ground.png"
 
+# Font paths
+FONT_DIR = f"{ASSETS_DIR}/fonts"
+FONT_REGULAR = f"{FONT_DIR}/Mochibop-Demo.ttf"
+FONT_BOLD = f"{FONT_DIR}/MochibopBold-Demo.ttf"
+
 # Visual settings
 BACKGROUND_SCROLL_SPEED_MULTIPLIER = 0.3  # Background scrolls at 30% of player speed (parallax effect)
 

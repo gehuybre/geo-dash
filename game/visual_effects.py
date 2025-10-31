@@ -5,7 +5,21 @@ Visual effects system for game feedback - popups, streaks, combos.
 import pygame
 import math
 import random
+import os
 from .config import *
+
+
+def _load_font(size, bold=False):
+    """Helper to load custom font or fallback to system font."""
+    try:
+        font_path = FONT_BOLD if bold and os.path.exists(FONT_BOLD) else FONT_REGULAR
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            # Fallback to system font
+            return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+    except:
+        return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
 
 
 class ScorePopup:
@@ -46,7 +60,7 @@ class ScorePopup:
         
         # Try to use pygame font
         try:
-            font = pygame.font.SysFont('Comic Sans MS', font_size, bold=True)
+            font = _load_font(font_size, bold=True)
             text_surface = font.render(text, True, color)
             text_surface.set_alpha(alpha)
             
@@ -104,7 +118,7 @@ class StreakIndicator:
             # Main streak text
             base_size = 48
             font_size = int(base_size * self.scale)
-            font = pygame.font.SysFont('Comic Sans MS', font_size, bold=True)
+            font = _load_font(font_size, bold=True)
             
             # Different messages based on streak level
             if self.streak_count >= 10:
@@ -127,7 +141,7 @@ class StreakIndicator:
             # Draw glow effect
             for offset in range(3, 0, -1):
                 glow_alpha = alpha // (offset + 1)
-                glow_font = pygame.font.SysFont('Comic Sans MS', font_size + offset * 2, bold=True)
+                glow_font = _load_font(font_size + offset * 2, bold=True)
                 glow_surface = glow_font.render(text, True, glow_color)
                 glow_surface.set_alpha(glow_alpha)
                 glow_rect = glow_surface.get_rect(center=(self.x, self.y))
@@ -140,7 +154,7 @@ class StreakIndicator:
             screen.blit(text_surface, text_rect)
             
             # Draw outline
-            outline_font = pygame.font.SysFont('Comic Sans MS', font_size, bold=True)
+            outline_font = _load_font(font_size, bold=True)
             outline_surface = outline_font.render(text, True, BLACK)
             outline_surface.set_alpha(alpha)
             for dx, dy in [(-2, 0), (2, 0), (0, -2), (0, 2)]:
@@ -176,7 +190,7 @@ class StreakBrokenIndicator:
         
         try:
             font_size = 36
-            font = pygame.font.SysFont('Comic Sans MS', font_size, bold=True)
+            font = _load_font(font_size, bold=True)
             
             # Show the streak that was lost
             if self.broken_streak >= 5:

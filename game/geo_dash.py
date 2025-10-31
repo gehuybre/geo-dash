@@ -4,6 +4,7 @@ Main game file that coordinates all game systems.
 """
 
 import pygame
+import os
 
 # Initialize Pygame first
 pygame.init()
@@ -14,6 +15,18 @@ from .obstacles import ObstacleGenerator
 from .visual_effects import VisualEffectsManager
 from managers.score_manager import ScoreManager
 from systems.input_handler import InputHandler
+
+
+def _load_font(size, bold=False):
+    """Helper to load custom font or fallback to system font."""
+    try:
+        font_path = FONT_BOLD if bold and os.path.exists(FONT_BOLD) else FONT_REGULAR
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+    except:
+        return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
 
 
 class Game:
@@ -103,14 +116,14 @@ class Game:
             self.screen.fill(SKY_BLUE)
             
             if temp_renderer.font_available:
-                title_font = pygame.font.SysFont('Comic Sans MS', 60)
+                title_font = _load_font(60, bold=True)
                 title_text = title_font.render("SELECT PLAYER", True, BLACK)
                 title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
                 self.screen.blit(title_text, title_rect)
                 
                 if input_mode:
                     # Show input box
-                    prompt_font = pygame.font.SysFont('Comic Sans MS', 40)
+                    prompt_font = _load_font(40)
                     prompt_text = prompt_font.render("Enter your name:", True, BLACK)
                     prompt_rect = prompt_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
                     self.screen.blit(prompt_text, prompt_rect)
@@ -121,19 +134,19 @@ class Game:
                     pygame.draw.rect(self.screen, BLACK, input_box, 3)
                     
                     # Show typed name
-                    name_font = pygame.font.SysFont('Comic Sans MS', 36)
+                    name_font = _load_font(36)
                     name_text = name_font.render(new_name + "|", True, BLACK)
                     name_rect = name_text.get_rect(center=(SCREEN_WIDTH // 2, 325))
                     self.screen.blit(name_text, name_rect)
                     
                     # Instructions
-                    hint_font = pygame.font.SysFont('Comic Sans MS', 24)
+                    hint_font = _load_font(24)
                     hint_text = hint_font.render("Press ENTER to confirm, ESC to cancel", True, (100, 100, 100))
                     hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
                     self.screen.blit(hint_text, hint_rect)
                 else:
                     # Show player list
-                    option_font = pygame.font.SysFont('Comic Sans MS', 40)
+                    option_font = _load_font(40)
                     for i, option in enumerate(options):
                         y_pos = 220 + i * 60
                         
@@ -158,7 +171,7 @@ class Game:
                             ])
                     
                     # Instructions
-                    hint_font = pygame.font.SysFont('Comic Sans MS', 24)
+                    hint_font = _load_font(24)
                     hint_text = hint_font.render("UP/DOWN to select, ENTER to confirm", True, (100, 100, 100))
                     hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
                     self.screen.blit(hint_text, hint_rect)
@@ -216,13 +229,13 @@ class Game:
             
             # Title
             if temp_renderer.font_available:
-                title_font = pygame.font.Font(None, 72)
+                title_font = _load_font(72, bold=True)
                 title_text = title_font.render("SELECT DIFFICULTY", True, BLACK)
                 title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
                 self.screen.blit(title_text, title_rect)
                 
                 # Options
-                option_font = pygame.font.Font(None, 56)
+                option_font = _load_font(56, bold=True)
                 for i, difficulty in enumerate(difficulties):
                     color = YELLOW if i == selected else WHITE
                     text = option_font.render(difficulty.upper(), True, color)
@@ -238,13 +251,13 @@ class Game:
                         ])
                 
                 # Instructions
-                inst_font = pygame.font.Font(None, 36)
+                inst_font = _load_font(36)
                 inst_text = inst_font.render("↑/↓ to select, ENTER to confirm", True, WHITE)
                 inst_rect = inst_text.get_rect(center=(SCREEN_WIDTH // 2, 550))
                 self.screen.blit(inst_text, inst_rect)
                 
                 # Difficulty descriptions
-                desc_font = pygame.font.Font(None, 32)
+                desc_font = _load_font(32)
                 descriptions = {
                     "easy": "Wider platforms (+25%)",
                     "medium": "Balanced challenge (+15%)",

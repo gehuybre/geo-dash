@@ -5,6 +5,7 @@ Supports custom background images.
 
 import pygame
 import random
+import os
 from .config import *
 
 
@@ -17,29 +18,34 @@ class Renderer:
         
         self.screen = screen
         
-        # Try to initialize fonts with cute, rounded fonts
-        # Using SysFont instead of Font to avoid pygame 2.6.1 + Python 3.14 circular import bug
+        # Try to initialize fonts with custom Mochibop font
         try:
-            # Try cute/rounded fonts first, fallback to system default
-            cute_fonts = ['Comic Sans MS', 'Chalkboard', 'Marker Felt', 'Bradley Hand', 'Arial Rounded MT Bold']
-            self.font = None
-            self.big_font = None
-            
-            for font_name in cute_fonts:
-                try:
-                    self.font = pygame.font.SysFont(font_name, 36)
-                    self.big_font = pygame.font.SysFont(font_name, 72)
-                    if self.font and self.big_font:
-                        print(f"✓ Using font: {font_name}")
-                        break
-                except:
-                    continue
-            
-            # If no cute fonts found, use default
-            if not self.font:
-                self.font = pygame.font.SysFont(None, 36)
-                self.big_font = pygame.font.SysFont(None, 72)
-                print("✓ Using default system font")
+            # Try custom fonts from assets/fonts first
+            if os.path.exists(FONT_REGULAR):
+                self.font = pygame.font.Font(FONT_REGULAR, 36)
+                self.big_font = pygame.font.Font(FONT_BOLD if os.path.exists(FONT_BOLD) else FONT_REGULAR, 72)
+                print(f"✓ Using custom font: Mochibop")
+            else:
+                # Fallback to system fonts
+                cute_fonts = ['Comic Sans MS', 'Chalkboard', 'Marker Felt', 'Bradley Hand', 'Arial Rounded MT Bold']
+                self.font = None
+                self.big_font = None
+                
+                for font_name in cute_fonts:
+                    try:
+                        self.font = pygame.font.SysFont(font_name, 36)
+                        self.big_font = pygame.font.SysFont(font_name, 72)
+                        if self.font and self.big_font:
+                            print(f"✓ Using system font: {font_name}")
+                            break
+                    except:
+                        continue
+                
+                # If no cute fonts found, use default
+                if not self.font:
+                    self.font = pygame.font.SysFont(None, 36)
+                    self.big_font = pygame.font.SysFont(None, 72)
+                    print("✓ Using default system font")
             
             self.font_available = True
         except (NotImplementedError, ImportError) as e:

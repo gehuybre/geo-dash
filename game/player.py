@@ -4,7 +4,20 @@ Player class with support for custom sprites.
 
 import pygame
 import math
+import os
 from .config import *
+
+
+def _load_font(size, bold=False):
+    """Helper to load custom font or fallback to system font."""
+    try:
+        font_path = FONT_BOLD if bold and os.path.exists(FONT_BOLD) else FONT_REGULAR
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+    except:
+        return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
 
 
 class ScorePopup:
@@ -36,7 +49,7 @@ class ScorePopup:
         
         # Try to use pygame font
         try:
-            font = pygame.font.SysFont('Comic Sans MS', font_size, bold=True)
+            font = _load_font(font_size, bold=True)
             text_surface = font.render(text, True, YELLOW)
             text_surface.set_alpha(alpha)
             
