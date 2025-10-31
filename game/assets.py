@@ -5,7 +5,7 @@ Falls back to procedural generation if assets are not found.
 
 import pygame
 import os
-from config import *
+from .config import *
 
 # Try to import PIL for better image loading support
 try:
@@ -124,8 +124,27 @@ class AssetManager:
         return backgrounds if len(backgrounds) > 0 else None
     
     def get_ground_sprite(self):
-        """Get ground sprite, returns None to use procedural generation."""
+        """Get ground sprite for tiling, returns None to use procedural generation."""
         return self.load_image(GROUND_SPRITE_PATH)
+    
+    def get_hazard_texture(self, hazard_type="lava"):
+        """
+        Get hazard floor texture.
+        
+        Args:
+            hazard_type: "lava" or "acid"
+            
+        Returns:
+            pygame.Surface or None if not found
+        """
+        hazard_paths = {
+            "lava": f"{ASSETS_DIR}/hazards/lava.jpg",
+            "acid": f"{ASSETS_DIR}/hazards/acid.png",
+        }
+        
+        # Default to lava if unknown type
+        path = hazard_paths.get(hazard_type, hazard_paths["lava"])
+        return self.load_image(path)
 
 
 # Global asset manager instance

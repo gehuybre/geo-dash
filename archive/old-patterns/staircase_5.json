@@ -1,0 +1,42 @@
+{
+  "name": "Staircase 5",
+  "description": "Symmetrical staircase reaching height 5",
+  "obstacles": [
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-5",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-2.5"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "Ceiling Drop 3",
+  "description": "Hanging obstacles dropping 3 units from ceiling",
+  "obstacles": [
+    {
+      "bar_type": "bar-2-8-3",
+      "gap_type": "gap-1.5"
+    },
+    {
+      "bar_type": "bar-2-8-3",
+      "gap_type": "gap-1.5"
+    },
+    {
+      "bar_type": "bar-2-8-3",
+      "gap_type": "gap-1.5"
+    },
+    {
+      "bar_type": "bar-2-8-3",
+      "gap_type": "gap-2"
+    }
+  ]
+}

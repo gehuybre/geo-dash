@@ -1,0 +1,26 @@
+{
+  "name": "Sky Bridge 2",
+  "description": "Floating platforms at height 2",
+  "obstacles": [
+    {
+      "bar_type": "bar-4-2-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-4-2-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-4-2-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-4-2-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-4-2-1",
+      "gap_type": "gap-2.5"
+    }
+  ]
+}

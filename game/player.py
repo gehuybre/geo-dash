@@ -4,7 +4,7 @@ Player class with support for custom sprites.
 
 import pygame
 import math
-from config import *
+from .config import *
 
 
 class Player:
@@ -12,7 +12,7 @@ class Player:
     
     def __init__(self, x, y):
         # Import asset_manager here to avoid circular import issues
-        from assets import asset_manager
+        from .assets import asset_manager
         
         self.x = x
         self.y = y

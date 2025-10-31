@@ -2,7 +2,7 @@
 Physics calculations for jump mechanics and obstacle validation.
 """
 
-from config import GRAVITY, JUMP_POWER, PLAYER_SPEED, MIN_OBSTACLE_HEIGHT, GROUND_Y
+from game.config import GRAVITY, JUMP_POWER, PLAYER_SPEED, MIN_OBSTACLE_HEIGHT, GROUND_Y
 
 
 class PhysicsCalculator:

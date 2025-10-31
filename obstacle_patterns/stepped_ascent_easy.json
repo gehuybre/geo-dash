@@ -1,0 +1,127 @@
+{
+  "name": "Stepped Ascent (Easy)",
+  "description": "Climb the steps, then drop!",
+  "obstacles": [
+    {
+      "bar_type": "bar-7-0",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-6-3",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-7-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-6-3",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-6-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-7-3",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-6-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-6-3",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-7-4",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-6-3",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.0"
+    }
+  ],
+  "metadata": {
+    "type": "platform",
+    "length": 29,
+    "rhythm": "Ascending steps"
+  }
+}

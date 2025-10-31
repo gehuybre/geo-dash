@@ -9,7 +9,7 @@ import os
 class ScoreManager:
     """Manages game scoring and high score persistence."""
     
-    def __init__(self, save_file="save_data.json"):
+    def __init__(self, save_file="data/save_data.json"):
         self.save_file = save_file
         self.distance = 0  # Distance traveled in pixels
         self.score = 0  # Score based on distance

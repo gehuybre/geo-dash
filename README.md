@@ -26,28 +26,39 @@ A cute, pastel-colored version of Geometry Dash built with Pygame! Now with **mo
 
 ```
 geo-dash/
-├── core/                # Core game logic
+├── game/                # Core game modules
+│   ├── geo_dash.py     # Main game class
+│   ├── config.py       # Game settings and constants
+│   ├── player.py       # Player character module
+│   ├── obstacles.py    # Obstacle generation
+│   ├── renderer.py     # Rendering and visual effects
+│   └── assets.py       # Asset loading system
+├── generators/          # Modular pattern generation
+│   ├── physics_engine.py     # Physics calculations
+│   ├── obstacle_builders.py  # Pattern building blocks
+│   ├── pattern_library.py    # Pre-designed patterns
+│   └── main.py              # Generator entry point
+├── core/                # Game physics
 │   └── physics.py      # Jump physics calculations
 ├── managers/            # Game state managers
 │   ├── pattern_manager.py    # Pattern loading/validation
+│   ├── bar_type_manager.py   # Bar type resolution
 │   └── score_manager.py      # Scoring and persistence
 ├── systems/             # Game systems
 │   └── input_handler.py      # Input processing
+├── data/                # Configuration and save data
+│   ├── bar_types.json  # Bar type definitions
+│   └── save_data.json  # High score storage
 ├── assets/              # Game assets
 │   ├── backgrounds/    # Background images
 │   ├── obstacles/      # Obstacle sprites
-│   └── player/         # Player sprites
-├── obstacle_patterns/   # JSON pattern definitions (18 patterns)
-├── geo_dash.py         # Main game file
-├── config.py           # Game settings and constants
-├── player.py           # Player character module
-├── obstacles.py        # Obstacle generation
-├── renderer.py         # Rendering and visual effects
-├── assets.py           # Asset loading system
-├── requirements.txt    # Dependencies
-└── ARCHITECTURE.md     # Detailed architecture docs
+│   └── player-characters/  # Player sprites
+├── obstacle_patterns/   # JSON pattern definitions
+├── archive/             # Old generators and patterns
+├── md-files/           # Documentation
+├── main.py             # Game entry point
+└── requirements.txt    # Dependencies
 ```
-├── save_data.json       # High score storage (auto-created)
 ├── assets/              # Custom sprites folder
 │   ├── README.md       # Asset customization guide
 │   ├── backgrounds/    # Multiple background images
@@ -75,18 +86,19 @@ pip install -r requirements.txt
 
 1. Run the game:
 ```bash
-python geo_dash.py
+python main.py
 ```
 
-2. Press **SPACE** to jump over obstacles
-3. Try to get the highest score possible!
-4. Press **ESC** to quit
+2. Select difficulty (Easy/Medium/Hard)
+3. Press **SPACE** to jump over obstacles
+4. Try to get the highest score possible!
+5. Press **ESC** to quit or **R** to restart
 
 ## 🎨 Customization
 
 ### Easy Configuration
 
-Edit `config.py` to customize gameplay:
+Edit `game/config.py` to customize gameplay:
 
 ```python
 # Physics settings
@@ -124,17 +136,37 @@ See `assets/README.md` for detailed asset specifications.
 ## 🎯 Controls
 
 - **SPACE** - Jump (or restart after game over)
+- **R** - Restart game
 - **ESC** - Quit game
+- **↑/↓** - Navigate difficulty menu
 
 ## 🎲 Game Mechanics
 
 - The player moves automatically from left to right
-- Obstacles use **predefined patterns only** (no random generation)
+- Obstacles use **physics-validated patterns** (guaranteed playable)
 - All obstacles are **guaranteed to be jumpable** based on the player's jump physics
 - **Distance-based scoring** - earn 1 point per 100 pixels traveled
 - **High score persistence** - your best score is automatically saved
 - Backgrounds cycle every 5 points with smooth parallax scrolling
 - The game ends when you collide with an obstacle
+
+## 🎨 Pattern Generator
+
+Generate new obstacle patterns with the modular pattern generator:
+
+```bash
+python -m generators.main
+```
+
+This creates physics-validated patterns in `obstacle_patterns/` with 3 difficulty variants each (easy/medium/hard).
+
+**Features:**
+- 10 unique pattern types (steady rhythm, wave rider, quick hops, etc.)
+- Automatic physics validation (all jumps are provably completable)
+- Difficulty scaling (+25% width for easy, +15% for medium)
+- Modular architecture for easy customization
+
+See `generators/README.md` for details on creating custom patterns.
 
 ### 🐛 Debug Mode
 

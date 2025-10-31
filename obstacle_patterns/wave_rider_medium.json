@@ -1,0 +1,135 @@
+{
+  "name": "Wave Rider (Medium)",
+  "description": "Ride the wave - platforms rise and fall",
+  "obstacles": [
+    {
+      "bar_type": "bar-4-0",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-9-1",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-3-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-8-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-9-2",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-8-3",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-5-3",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-9-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.75"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-8-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-5-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-2-1",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-1",
+      "gap_type": "gap-1.75"
+    }
+  ],
+  "metadata": {
+    "type": "platform",
+    "length": 31,
+    "rhythm": "Flowing waves"
+  }
+}

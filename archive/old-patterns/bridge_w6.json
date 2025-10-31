@@ -1,0 +1,30 @@
+{
+  "name": "Bridge Width 6",
+  "description": "Platform bridge with width-6 platforms",
+  "obstacles": [
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2"
+    },
+    {
+      "bar_type": "bar-6-1",
+      "gap_type": "gap-2.5"
+    }
+  ]
+}

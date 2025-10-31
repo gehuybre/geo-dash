@@ -1,0 +1,10 @@
+{
+  "name": "Sky Bridge",
+  "description": "Floating platforms in mid-air requiring jump timing",
+  "obstacles": [
+    {"bar_type": "bar-5-2-1", "gap_type": "gap-2"},
+    {"bar_type": "bar-4-2-1", "gap_type": "gap-2"},
+    {"bar_type": "bar-5-2-1", "gap_type": "gap-2"},
+    {"bar_type": "bar-4-2-1", "gap_type": "gap-2.5"}
+  ]
+}

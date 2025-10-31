@@ -5,7 +5,7 @@ Supports custom background images.
 
 import pygame
 import random
-from config import *
+from .config import *
 
 
 class Renderer:
@@ -13,7 +13,7 @@ class Renderer:
     
     def __init__(self, screen):
         # Import asset_manager here to avoid circular import issues
-        from assets import asset_manager
+        from .assets import asset_manager
         
         self.screen = screen
         

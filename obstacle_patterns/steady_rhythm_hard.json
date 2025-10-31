@@ -1,0 +1,127 @@
+{
+  "name": "Steady Rhythm (Hard)",
+  "description": "Consistent platform hops at steady height",
+  "obstacles": [
+    {
+      "bar_type": "bar-6-0",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-2.25"
+    },
+    {
+      "bar_type": "bar-5-2",
+      "gap_type": "gap-2.0"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-2.25"
+    }
+  ],
+  "metadata": {
+    "type": "platform",
+    "length": 29,
+    "rhythm": "4/4 steady"
+  }
+}
