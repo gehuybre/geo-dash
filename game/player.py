@@ -87,6 +87,7 @@ class Player:
         self.just_landed = False  # Flag for landing bonus
         self.combo_streak = 0  # Number of consecutive platform landings without touching ground
         self.last_landed_on_ground = True  # Track if last landing was on ground
+        self.current_obstacle = None  # Track which obstacle player is currently on to prevent duplicate bonuses
         
         # Try to load custom sprite
         self.custom_sprite = asset_manager.get_player_sprite()
@@ -100,6 +101,7 @@ class Player:
             self.on_ground = False
             self.jumps_used = 1
             self.has_double_jump = True
+            self.current_obstacle = None  # Clear obstacle reference when jumping off
         # Second jump: in mid-air (double jump)
         elif self.has_double_jump and self.jumps_used == 1 and not self.on_ground:
             self.velocity_y = JUMP_POWER * 0.9  # Slightly weaker second jump
@@ -132,6 +134,7 @@ class Player:
             if not self.last_landed_on_ground:
                 self.combo_streak = 0
                 self.last_landed_on_ground = True
+                self.current_obstacle = None  # Clear obstacle reference when on ground
         elif self.velocity_y > 0:
             # If falling and not on ground level, assume in air (will be corrected by collision)
             # Only set to False if actually falling, not if standing on obstacle

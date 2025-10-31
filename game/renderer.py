@@ -170,43 +170,51 @@ class Renderer:
         if not self.font_available:
             # Draw simple text blocks when font is not available
             if player_name:
-                self._draw_simple_text(f"Player: {player_name}", 10, 10)
-                self._draw_simple_text(f"Score: {score}", 10, 35)
-                self._draw_simple_text(f"Best: {high_score}", 10, 60)
+                self._draw_simple_text(f"Player: {player_name}", 20, 10)
+                self._draw_simple_text(f"Score: {score}", 20, 35)
+                self._draw_simple_text(f"Best: {high_score}", 20, 60)
             else:
-                self._draw_simple_text(f"Score: {score}", 10, 10)
-                self._draw_simple_text(f"Best: {high_score}", 10, 50)
+                self._draw_simple_text(f"Score: {score}", 20, 10)
+                self._draw_simple_text(f"Best: {high_score}", 20, 50)
             if show_instructions:
                 self._draw_simple_text("Press SPACE to jump!", SCREEN_WIDTH // 2 - 150, 10)
             # Pattern debug info
             if SHOW_PATTERN_DEBUG and current_pattern:
-                self._draw_simple_text(f"Pattern: {current_pattern}", 10, 90, color=BLACK)
+                self._draw_simple_text(f"Pattern: {current_pattern}", 20, 90, color=BLACK)
         else:
-            # Player name (if provided)
-            y_offset = 10
+            # Player name (if provided) - compact layout on one line with score
+            y_offset = 15
             if player_name:
                 player_text = self.font.render(f"🎮 {player_name}", True, HEART_RED)
-                self.screen.blit(player_text, (10, y_offset))
-                y_offset += 35
-            
-            # Score
-            score_text = self.font.render(f"Score: {score}", True, BLACK)
-            self.screen.blit(score_text, (10, y_offset))
-            y_offset += 35
-            
-            # High score
-            high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
-            self.screen.blit(high_score_text, (10, y_offset))
+                self.screen.blit(player_text, (20, y_offset))
+                
+                # Score on same line, to the right of player name
+                score_text = self.font.render(f"Score: {score}", True, BLACK)
+                score_x = 20 + player_text.get_width() + 30  # 30px spacing
+                self.screen.blit(score_text, (score_x, y_offset))
+                
+                # High score on same line, to the right of score
+                high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
+                high_score_x = score_x + score_text.get_width() + 30
+                self.screen.blit(high_score_text, (high_score_x, y_offset))
+            else:
+                # No player name - just score and high score
+                score_text = self.font.render(f"Score: {score}", True, BLACK)
+                self.screen.blit(score_text, (20, y_offset))
+                
+                high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
+                high_score_x = 20 + score_text.get_width() + 30
+                self.screen.blit(high_score_text, (high_score_x, y_offset))
             
             # Instructions
             if show_instructions:
                 instruction_text = self.font.render("Press SPACE to jump!", True, BLACK)
-                self.screen.blit(instruction_text, (SCREEN_WIDTH // 2 - 150, 10))
+                self.screen.blit(instruction_text, (SCREEN_WIDTH // 2 - 150, 15))
             
-            # Pattern debug info
+            # Pattern debug info (below main UI)
             if SHOW_PATTERN_DEBUG and current_pattern:
                 pattern_text = self.font.render(f"Pattern: {current_pattern}", True, BLACK)
-                self.screen.blit(pattern_text, (10, 90))
+                self.screen.blit(pattern_text, (20, 55))
     
     def _draw_simple_text(self, text, x, y, color=BLACK, size=16):
         """Draw simple pixel text when pygame.font is not available."""

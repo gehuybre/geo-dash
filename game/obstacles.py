@@ -311,12 +311,13 @@ class ObstacleGenerator:
                     player.has_double_jump = False
                     player.rotation = 0  # Stop rotation when on obstacle
                     
-                    # Trigger landing visual effects on the OBSTACLE (only if just landed)
-                    if not player_is_on_obstacle:  # First landing on this obstacle
+                    # Trigger landing visual effects on the OBSTACLE (only if just landed on NEW obstacle)
+                    if player.current_obstacle != obstacle:  # Landing on a different obstacle
                         obstacle.trigger_landing_effect()
                         player.just_landed = True  # Flag for scoring bonus
                         player.combo_streak += 1  # Increase combo for platform landing
                         player.last_landed_on_ground = False
+                        player.current_obstacle = obstacle  # Track this obstacle
                     
                     player_is_on_obstacle = True
                     # No collision, just landing
