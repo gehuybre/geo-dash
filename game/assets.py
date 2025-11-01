@@ -106,10 +106,22 @@ class AssetManager:
             return None
         
         metadata = self.spritesheet_metadata[sheet_name]
-        if sprite_name not in metadata['sprites']:
-            return None
         
-        sprite_data = metadata['sprites'][sprite_name]
+        # Find sprite in metadata (can be dict or list of sprites)
+        sprite_data = None
+        if isinstance(metadata.get('sprites'), dict):
+            # Dict format (obstacles, player_characters)
+            if sprite_name not in metadata['sprites']:
+                return None
+            sprite_data = metadata['sprites'][sprite_name]
+        elif isinstance(metadata.get('sprites'), list):
+            # List format (irregular_obstacles)
+            matching = [s for s in metadata['sprites'] if s['name'] == sprite_name]
+            if not matching:
+                return None
+            sprite_data = matching[0]
+        else:
+            return None
         
         # Create a cache key
         cache_key = f"sheet_{sheet_name}_{sprite_name}"
@@ -325,6 +337,9 @@ class AssetManager:
             irregular_sprite = self._get_irregular_sprite(grid_width, grid_height, width, height)
             if irregular_sprite:
                 return irregular_sprite
+            # For irregular patterns, don't fall back to regular sprites - return None
+            print(f"⚠️ No irregular sprite found for {grid_width}x{grid_height} grid")
+            return None
         
         # Try to get from regular spritesheet
         sprite = self._get_sprite_from_sheet('obstacles', sprite_name, (width, height))
@@ -355,16 +370,70 @@ class AssetManager:
     
     def _get_irregular_sprite(self, grid_width, grid_height, target_width, target_height):
         """
-        Get a random irregular sprite that fits the requested size.
+        Get a random irregular sprite that best fits the requested size.
+        Loads SVGs directly from extracted-kawaii folder for crisp, sharp graphics.
         
         Args:
-            grid_width: Width in grid units
-            grid_height: Height in grid units  
-            target_width: Target width in pixels
-            target_height: Target height in pixels
+            grid_width: Width in grid units (game obstacle size)
+            grid_height: Height in grid units (game obstacle size)
+            target_width: Target width in pixels (will be scaled up 4-8x)
+            target_height: Target height in pixels (will be scaled up 4-8x)
             
         Returns:
             pygame.Surface or None if no matching sprite
+        """
+        import random
+        import os
+        
+        # Check if we have SVG kawaii sprites
+        kawaii_dir = f"{ASSETS_DIR}/obstacles/extracted-kawaii"
+        if not os.path.exists(kawaii_dir):
+            # Fall back to spritesheet method
+            return self._get_irregular_sprite_from_sheet(grid_width, grid_height, target_width, target_height)
+        
+        # Get all SVG files
+        svg_files = [f for f in os.listdir(kawaii_dir) if f.endswith('.svg')]
+        if not svg_files:
+            return self._get_irregular_sprite_from_sheet(grid_width, grid_height, target_width, target_height)
+        
+        # Use the larger dimension to pick sprite size
+        max_dimension = max(grid_width, grid_height)
+        
+        # Map obstacle size to scale factor
+        # Scale obstacles 6-8x larger for dramatic kawaii presence
+        if max_dimension <= 2:
+            scale_factor = 6  # 60px → 360px, 90px → 540px
+        elif max_dimension <= 3:
+            scale_factor = 7  # 90px → 630px, 120px → 840px
+        elif max_dimension <= 4:
+            scale_factor = 6  # 120px → 720px, 150px → 900px
+        else:
+            scale_factor = 5  # Keep larger obstacles from being TOO massive
+        
+        # Calculate scaled size
+        scaled_width = target_width * scale_factor
+        scaled_height = target_height * scale_factor
+        
+        # Clamp to reasonable limits (200-800px)
+        scaled_width = max(200, min(800, scaled_width))
+        scaled_height = max(200, min(800, scaled_height))
+        
+        # Pick a random kawaii SVG
+        chosen_svg = random.choice(svg_files)
+        svg_path = f"{kawaii_dir}/{chosen_svg}"
+        
+        # Load SVG directly at target size for crisp rendering
+        sprite = self.load_image(svg_path, (scaled_width, scaled_height))
+        
+        if sprite:
+            print(f"✓ Using irregular SVG: {chosen_svg} scaled to {scaled_width}x{scaled_height}px ({scale_factor}x) for {grid_width}x{grid_height} grid")
+        
+        return sprite
+    
+    def _get_irregular_sprite_from_sheet(self, grid_width, grid_height, target_width, target_height):
+        """
+        Fallback method: Get irregular sprite from spritesheet.
+        Used when SVG files are not available.
         """
         import random
         
@@ -372,23 +441,49 @@ class AssetManager:
         if not metadata:
             return None
         
-        # Find sprites that match the grid size
+        # Use the larger dimension to pick sprite size
+        max_dimension = max(grid_width, grid_height)
+        
+        # Map obstacle size to sprite category and scale factor
+        if max_dimension <= 2:
+            size_category = 'tiny'
+            scale_factor = 6
+        elif max_dimension <= 3:
+            size_category = 'small'
+            scale_factor = 7
+        elif max_dimension <= 4:
+            size_category = 'medium'
+            scale_factor = 6
+        else:
+            size_category = 'large'
+            scale_factor = 5
+        
+        # Calculate scaled size
+        scaled_width = target_width * scale_factor
+        scaled_height = target_height * scale_factor
+        
+        # Clamp to reasonable limits (200-800px)
+        scaled_width = max(200, min(800, scaled_width))
+        scaled_height = max(200, min(800, scaled_height))
+        
+        # Get all sprites of this size category
         matching_sprites = [
             s for s in metadata['sprites']
-            if s['grid_width'] == grid_width and s['grid_height'] == grid_height
+            if s['size_category'] == size_category
         ]
         
         if not matching_sprites:
-            return None
+            # Fall back to any sprite
+            matching_sprites = metadata['sprites']
         
-        # Pick a random matching sprite for variety
-        sprite_info = random.choice(matching_sprites)
-        sprite = self._get_sprite_from_sheet('irregular_obstacles', sprite_info['name'], (target_width, target_height))
+        if matching_sprites:
+            sprite_info = random.choice(matching_sprites)
+            sprite = self._get_sprite_from_sheet('irregular_obstacles', sprite_info['name'], (scaled_width, scaled_height))
+            if sprite:
+                print(f"✓ Using irregular sprite: {sprite_info['name']} ({sprite_info['size_category']}) scaled to {scaled_width}x{scaled_height}px ({scale_factor}x) for {grid_width}x{grid_height} grid")
+            return sprite
         
-        if sprite:
-            print(f"✓ Using irregular sprite: {sprite_info['name']} ({sprite_info['size_category']}) for {grid_width}x{grid_height} grid")
-        
-        return sprite
+        return None
     
     def _create_composite_sprite(self, grid_width, grid_height, target_width, target_height):
         """

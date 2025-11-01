@@ -42,6 +42,25 @@ class Obstacle:
             self.y = GROUND_Y + PLAYER_SIZE - height - y_offset
             self.custom_sprite = asset_manager.get_obstacle_sprite(self.width, self.height, prefer_irregular=prefer_irregular)
             self.hazard_texture = None
+            
+            # Store sprite dimensions if they differ from collision box (for irregular kawaii sprites)
+            self.sprite_width = self.width
+            self.sprite_height = self.height
+            self.sprite_y_offset = 0  # Default: no offset
+            self.use_sprite_collision = False  # Default: use regular collision
+            
+            if self.custom_sprite:
+                actual_sprite_width = self.custom_sprite.get_width()
+                actual_sprite_height = self.custom_sprite.get_height()
+                if actual_sprite_width != self.width or actual_sprite_height != self.height:
+                    # Large irregular sprite - store its actual size for rendering
+                    self.sprite_width = actual_sprite_width
+                    self.sprite_height = actual_sprite_height
+                    # Adjust y position so sprite bottom aligns with collision box bottom
+                    # This makes large sprites extend upward from the collision point
+                    self.sprite_y_offset = actual_sprite_height - self.height
+                    self.use_sprite_collision = True  # Enable sprite-based collision
+            
             # Load pattern for tiling
             self.obstacle_pattern = asset_manager.get_obstacle_pattern()
             # Random offset into the pattern for variety
@@ -55,12 +74,21 @@ class Obstacle:
                 self.pattern_offset_y = 0
             
             # Create collision mask for pixel-perfect collision with irregular shapes
+            # IMPORTANT: Create mask AFTER determining sprite dimensions
             self.collision_mask = None
             if self.custom_sprite:
                 try:
                     self.collision_mask = pygame.mask.from_surface(self.custom_sprite)
-                except:
+                except Exception as e:
+                    print(f"⚠️  Could not create collision mask: {e}")
                     self.collision_mask = None
+            
+            # Calculate landing platform line for irregular obstacles
+            self.landing_platform_y = None
+            self.platform_left = None  # Leftmost solid pixel at platform height
+            self.platform_right = None  # Rightmost solid pixel at platform height
+            if self.collision_mask and self.use_sprite_collision:
+                self.landing_platform_y = self._calculate_landing_platform()
         
         self.passed = False
         
@@ -68,6 +96,82 @@ class Obstacle:
         self.landing_squish = 0  # 0-1, amount of squish effect
         self.landing_glow = 0  # 0-255, glow intensity
         self.landing_blink = 0  # Counter for blink effect
+    
+    def _calculate_landing_platform(self):
+        """
+        Calculate the Y coordinate of the landing platform for irregular obstacles.
+        Finds the first substantial horizontal landing surface from the top.
+        
+        Returns: Y coordinate in world space, or None if no platform found.
+        """
+        if not self.collision_mask:
+            return None
+        
+        mask_width = self.collision_mask.get_size()[0]
+        mask_height = self.collision_mask.get_size()[1]
+        
+        # Sample points across the width to find topmost pixels
+        sample_points = max(20, mask_width // 2)  # Sample densely to find platforms
+        topmost_pixels = []
+        
+        for i in range(sample_points):
+            x = int((i / sample_points) * mask_width)
+            if x >= mask_width:
+                x = mask_width - 1
+            
+            # Find topmost solid pixel in this column
+            for y in range(mask_height):
+                try:
+                    if self.collision_mask.get_at((x, y)):
+                        topmost_pixels.append((x, y))
+                        break
+                except IndexError:
+                    break
+        
+        if not topmost_pixels:
+            return None
+        
+        # Find the first substantial horizontal platform
+        # Group pixels by their Y coordinate and find which Y has the most horizontal coverage
+        y_coverage = {}
+        tolerance = 10  # Pixels within ±10 are considered same height
+        
+        for x, y in topmost_pixels:
+            # Find or create a height group
+            found_group = False
+            for group_y in y_coverage:
+                if abs(y - group_y) <= tolerance:
+                    y_coverage[group_y].append(x)
+                    found_group = True
+                    break
+            if not found_group:
+                y_coverage[y] = [x]
+        
+        # Find the highest platform that has good horizontal coverage (at least 40% of width)
+        min_coverage = mask_width * 0.4
+        platform_y = None
+        
+        for y in sorted(y_coverage.keys()):  # Sort from top to bottom
+            x_list = y_coverage[y]
+            if len(x_list) >= min_coverage / sample_points * len(topmost_pixels):
+                # This is a substantial horizontal surface
+                platform_y = y
+                break
+        
+        # Fallback: if no substantial platform found, use the minimum Y (topmost point)
+        if platform_y is None:
+            platform_y = min(y for x, y in topmost_pixels)
+        
+        # Convert to world coordinates
+        sprite_y = self.y - self.sprite_y_offset
+        world_platform_y = sprite_y + platform_y
+        
+        # Debug output for first few obstacles
+        if random.random() < 0.1:  # Print for ~10% of obstacles
+            print(f"🎯 Platform: sprite={self.sprite_width}x{self.sprite_height}, "
+                  f"platform_y_local={platform_y}, world={world_platform_y}, coverage={len(y_coverage)}")
+        
+        return world_platform_y
     
     def update(self):
         """Move obstacle left and update visual effects."""
@@ -91,6 +195,14 @@ class Obstacle:
         """Get collision rectangle."""
         return pygame.Rect(self.x, self.y, self.width, self.height)
     
+    def get_sprite_rect(self):
+        """Get the full sprite rectangle (for large irregular sprites, this includes the offset area)."""
+        if self.use_sprite_collision:
+            sprite_y = self.y - self.sprite_y_offset
+            return pygame.Rect(self.x, sprite_y, self.sprite_width, self.sprite_height)
+        else:
+            return self.get_rect()
+    
     def check_pixel_collision(self, player_rect, player_mask=None):
         """
         Check pixel-perfect collision with player.
@@ -104,25 +216,61 @@ class Obstacle:
             # Fall back to rect collision if no mask available
             return self.get_rect().colliderect(player_rect)
         
-        if player_mask:
-            # Pixel-perfect collision with both masks
-            # Add margin to make collision more forgiving (erode the mask slightly)
-            offset = (player_rect.x - self.x, player_rect.y - self.y)
+        # For large irregular sprites, use the sprite dimensions and offset
+        if getattr(self, 'use_sprite_collision', False):
+            sprite_y_offset = getattr(self, 'sprite_y_offset', 0)
+            sprite_y = self.y - sprite_y_offset
             
-            # Create a slightly smaller collision area by checking offset
-            # This effectively creates a "safe zone" around the edges
-            overlap = self.collision_mask.overlap(player_mask, offset)
-            if overlap is None:
+            # Create sprite rect for collision detection
+            sprite_rect = pygame.Rect(self.x, sprite_y, self.sprite_width, self.sprite_height)
+            
+            # Quick reject if rects don't overlap
+            if not sprite_rect.colliderect(player_rect):
                 return False
             
-            # Allow significant overlaps (~10x10 pixels) for more forgiving collisions
-            overlap_area = self.collision_mask.overlap_area(player_mask, offset)
-            return overlap_area > 100  # ~10x10 pixels minimum overlap to count as collision
+            if player_mask:
+                # Pixel-perfect collision with both masks
+                offset = (player_rect.x - self.x, player_rect.y - sprite_y)
+                overlap = self.collision_mask.overlap(player_mask, offset)
+                if overlap is None:
+                    return False
+                
+                # Allow some overlaps for forgiving collisions (~10x10 pixels)
+                overlap_area = self.collision_mask.overlap_area(player_mask, offset)
+                return overlap_area > 100  # ~10x10 pixels minimum overlap
+            else:
+                # Check if player rect overlaps with any pixel in obstacle mask
+                overlap_rect = sprite_rect.clip(player_rect)
+                if overlap_rect.width == 0 or overlap_rect.height == 0:
+                    return False
+                
+                # Check mask at overlap area
+                for dy in range(overlap_rect.height):
+                    for dx in range(overlap_rect.width):
+                        mask_x = overlap_rect.x - self.x + dx
+                        mask_y = overlap_rect.y - sprite_y + dy
+                        if (0 <= mask_x < self.sprite_width and 
+                            0 <= mask_y < self.sprite_height and
+                            self.collision_mask.get_at((mask_x, mask_y))):
+                            return True
+                return False
         else:
-            # Check if player rect overlaps with any pixel in obstacle mask
-            overlap_rect = self.get_rect().clip(player_rect)
-            if overlap_rect.width == 0 or overlap_rect.height == 0:
-                return False
+            # Regular sized sprite - use standard collision
+            if player_mask:
+                # Pixel-perfect collision with both masks
+                offset = (player_rect.x - self.x, player_rect.y - self.y)
+                overlap = self.collision_mask.overlap(player_mask, offset)
+                if overlap is None:
+                    return False
+                
+                # Allow significant overlaps (~10x10 pixels) for more forgiving collisions
+                overlap_area = self.collision_mask.overlap_area(player_mask, offset)
+                return overlap_area > 100  # ~10x10 pixels minimum overlap to count as collision
+            else:
+                # Check if player rect overlaps with any pixel in obstacle mask
+                overlap_rect = self.get_rect().clip(player_rect)
+                if overlap_rect.width == 0 or overlap_rect.height == 0:
+                    return False
             
             # Check pixels in the overlap area
             for px in range(overlap_rect.left, overlap_rect.right):
@@ -137,10 +285,43 @@ class Obstacle:
     def can_land_on_top(self, player_rect, player_mask=None):
         """
         Check if player can land on top of this obstacle.
-        Uses pixel-perfect detection to find the top surface of irregular shapes.
+        Uses pre-calculated landing platform for irregular shapes, or pixel-perfect detection as fallback.
         
         Returns: (can_land, landing_y) tuple
         """
+        # Use pre-calculated landing platform for irregular obstacles
+        if self.landing_platform_y is not None and self.use_sprite_collision:
+            platform_y = self.landing_platform_y
+            # More forgiving landing zone for irregular shapes (35 pixels)
+            if player_rect.bottom >= platform_y - 35 and player_rect.bottom <= platform_y + 15:
+                # Check horizontal overlap - but ONLY with actual platform area, not entire sprite
+                # Use pixel-perfect check at the player's horizontal position
+                player_center_x = player_rect.centerx
+                local_x = player_center_x - self.x
+                
+                # Check if player's center is within sprite bounds
+                if 0 <= local_x < self.sprite_width:
+                    # Calculate platform Y in mask coordinates
+                    sprite_y = self.y - self.sprite_y_offset
+                    mask_y = int(platform_y - sprite_y)
+                    
+                    # Check if there's actually a solid pixel at this position
+                    if self.collision_mask and 0 <= mask_y < self.collision_mask.get_size()[1]:
+                        # Check in a small horizontal range around player center
+                        for dx in range(-5, 6):  # Check 11 pixels around center
+                            check_x = int(local_x) + dx
+                            if 0 <= check_x < self.sprite_width:
+                                # Check a few pixels vertically around platform line
+                                for dy in range(-3, 4):
+                                    check_y = mask_y + dy
+                                    if 0 <= check_y < self.collision_mask.get_size()[1]:
+                                        try:
+                                            if self.collision_mask.get_at((check_x, check_y)):
+                                                return True, platform_y
+                                        except IndexError:
+                                            pass
+            return False, None
+        
         if not self.collision_mask:
             # Fall back to simple top collision with LARGER safe zone
             rect = self.get_rect()
@@ -150,22 +331,41 @@ class Obstacle:
                     return True, rect.top
             return False, None
         
+        # For large irregular sprites, use sprite dimensions and offset
+        if self.use_sprite_collision:
+            sprite_y = self.y - self.sprite_y_offset
+            sprite_width = self.sprite_width
+            sprite_height = self.sprite_height
+        else:
+            sprite_y = self.y
+            sprite_width = self.width
+            sprite_height = self.height
+        
         # For pixel-perfect collision, find the topmost pixel
         # Check a column under the player's center
         player_center_x = player_rect.centerx
         local_x = player_center_x - self.x
         
-        if local_x < 0 or local_x >= self.width:
+        if local_x < 0 or local_x >= sprite_width:
             return False, None
         
+        # Clamp local_x to mask bounds
+        mask_width = self.collision_mask.get_size()[0]
+        mask_height = self.collision_mask.get_size()[1]
+        local_x = int(max(0, min(local_x, mask_width - 1)))
+        
         # Find topmost solid pixel in this column
-        for local_y in range(self.height):
-            if self.collision_mask.get_at((int(local_x), local_y)):
-                world_y = self.y + local_y
-                # Check if player is falling onto this point with LARGER safe zone
-                # Increased from 5 to 15 pixels for more forgiving landings
-                if player_rect.bottom >= world_y - 15 and player_rect.bottom <= world_y + 15:
-                    return True, world_y
+        for local_y in range(mask_height):
+            try:
+                if self.collision_mask.get_at((local_x, local_y)):
+                    world_y = sprite_y + local_y
+                    # Check if player is falling onto this point with LARGER safe zone
+                    # Increased from 5 to 25 pixels for very forgiving landings on irregular shapes
+                    if player_rect.bottom >= world_y - 25 and player_rect.bottom <= world_y + 25:
+                        return True, world_y
+                    break
+            except IndexError:
+                # Safety check - if we go out of bounds, stop
                 break
         
         return False, None
@@ -248,34 +448,167 @@ class Obstacle:
             pygame.draw.circle(screen, YELLOW, (star_x, star_y), 2)
     
     def _draw_custom_sprite(self, screen):
-        """Draw custom sprite with landing effects."""
+        """Draw custom sprite with landing effects and two-tone rendering for irregular obstacles."""
         # Calculate squish dimensions
         squish_factor = 1 - (self.landing_squish * 0.4)  # Max 40% squish reduction
-        squish_height = int(self.height * squish_factor)
-        squish_y_offset = self.height - squish_height
+        squish_height = int(self.sprite_height * squish_factor)
+        squish_y_offset = self.sprite_height - squish_height
+        
+        # Calculate render position (for large irregular sprites, extend upward)
+        sprite_y_offset = getattr(self, 'sprite_y_offset', 0)
+        render_y = self.y - sprite_y_offset + squish_y_offset
         
         # Draw glow effect if active
         if self.landing_glow > 20:
             glow_size = 8
-            for i in range(3):
-                glow_alpha = int(self.landing_glow * (1 - i * 0.3))
-                glow_surface = pygame.Surface((self.width + glow_size*2, squish_height + glow_size*2), pygame.SRCALPHA)
-                color = (255, 255, 100, glow_alpha)  # Yellow glow
-                pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
-                screen.blit(glow_surface, (self.x - glow_size, self.y + squish_y_offset - glow_size))
+            
+            # For irregular sprites with landing platforms, only glow around the platform area
+            if self.use_sprite_collision and self.landing_platform_y is not None and self.platform_left is not None and self.platform_right is not None:
+                # Use the ACTUAL platform width we measured!
+                actual_platform_width = self.platform_right - self.platform_left
+                glow_width = actual_platform_width + 20  # Add small margin (10px each side)
+                glow_height = min(squish_height, self.height * 2)  # Max 2x collision box height
+                
+                # Position glow at the platform location
+                glow_x_offset = self.platform_left - 10  # Account for margin
+                
+                for i in range(3):
+                    glow_alpha = int(self.landing_glow * (1 - i * 0.3))
+                    glow_surface = pygame.Surface((glow_width + glow_size*2, glow_height + glow_size*2), pygame.SRCALPHA)
+                    color = (255, 255, 100, glow_alpha)  # Yellow glow
+                    pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
+                    screen.blit(glow_surface, (self.x + glow_x_offset - glow_size, render_y + squish_height - glow_height - glow_size))
+            elif self.use_sprite_collision and self.landing_platform_y is not None:
+                # Fallback if platform extent not calculated yet
+                glow_width = min(self.sprite_width, self.width * 3)  # Max 3x collision box width
+                glow_height = min(squish_height, self.height * 2)  # Max 2x collision box height
+                
+                # Center the glow horizontally on the sprite
+                glow_x_offset = (self.sprite_width - glow_width) // 2
+                
+                for i in range(3):
+                    glow_alpha = int(self.landing_glow * (1 - i * 0.3))
+                    glow_surface = pygame.Surface((glow_width + glow_size*2, glow_height + glow_size*2), pygame.SRCALPHA)
+                    color = (255, 255, 100, glow_alpha)  # Yellow glow
+                    pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
+                    screen.blit(glow_surface, (self.x + glow_x_offset - glow_size, render_y + squish_height - glow_height - glow_size))
+            else:
+                # Regular glow for normal sprites
+                for i in range(3):
+                    glow_alpha = int(self.landing_glow * (1 - i * 0.3))
+                    glow_surface = pygame.Surface((self.sprite_width + glow_size*2, squish_height + glow_size*2), pygame.SRCALPHA)
+                    color = (255, 255, 100, glow_alpha)  # Yellow glow
+                    pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
+                    screen.blit(glow_surface, (self.x - glow_size, render_y - glow_size))
         
         # Scale sprite to squish dimensions
         if squish_factor < 0.99:  # Only scale if there's noticeable squish
-            squished_sprite = pygame.transform.scale(self.custom_sprite, (self.width, squish_height))
-            screen.blit(squished_sprite, (self.x, self.y + squish_y_offset))
+            sprite_to_draw = pygame.transform.scale(self.custom_sprite, (self.sprite_width, squish_height))
         else:
-            screen.blit(self.custom_sprite, (self.x, self.y))
+            sprite_to_draw = self.custom_sprite
+        
+        # Two-tone rendering for irregular obstacles with landing platforms
+        if self.landing_platform_y is not None and self.use_sprite_collision:
+            # Calculate where the platform line intersects the sprite
+            platform_y_local = self.landing_platform_y - render_y
+            
+            # Debug first obstacle with platform
+            if not hasattr(self, '_debug_printed'):
+                self._debug_printed = True
+                print(f"\n🎨 Two-tone rendering debug:")
+                print(f"  sprite size: {self.sprite_width}x{self.sprite_height}")
+                print(f"  collision_mask size: {self.collision_mask.get_size() if self.collision_mask else 'None'}")
+                print(f"  squish_height: {squish_height}, squish_factor: {squish_factor}")
+                print(f"  render_y: {render_y}, platform_y_local: {platform_y_local}")
+                print(f"  platform_y (world): {self.landing_platform_y}")
+                print(f"  Condition check: 0 < {platform_y_local} < {squish_height} = {0 < platform_y_local < squish_height}")
+            
+            if 0 < platform_y_local < squish_height:
+                # Create two surfaces for above and below the platform
+                above_height = int(platform_y_local)
+                below_height = squish_height - above_height
+                
+                if not hasattr(self, '_debug_printed2'):
+                    self._debug_printed2 = True
+                    print(f"  ✅ Two-tone active! above_height={above_height}, below_height={below_height}")
+                
+                # Draw decorative portion above platform (lighter/transparent)
+                if above_height > 0:
+                    above_surface = sprite_to_draw.subsurface(pygame.Rect(0, 0, self.sprite_width, above_height)).copy()
+                    above_surface.set_alpha(120)  # 47% opacity - clearly decorative
+                    screen.blit(above_surface, (self.x, render_y))
+                
+                # Draw platform line indicator - simple line across the sprite width
+                platform_line_y = render_y + above_height
+                
+                # Use ORIGINAL mask coordinates to find where solid pixels actually are
+                mask_y_position = int(above_height * (self.sprite_height / squish_height))  # Scale back to original mask coordinates
+                
+                if not hasattr(self, '_debug_mask_check'):
+                    self._debug_mask_check = True
+                    print(f"🔍 Mask check: above_height={above_height}, mask_y_position={mask_y_position}")
+                    print(f"   sprite_height={self.sprite_height}, squish_height={squish_height}")
+                
+                # Find only the horizontal extents where there are solid pixels
+                if self.collision_mask and mask_y_position < self.collision_mask.get_size()[1]:
+                    mask_width = self.collision_mask.get_size()[0]
+                    
+                    # Find leftmost and rightmost solid pixels at platform height
+                    leftmost = None
+                    rightmost = None
+                    
+                    for x in range(mask_width):
+                        # Check if there's a solid pixel at or near this x position
+                        has_pixel = False
+                        for y_check in range(max(0, mask_y_position - 2), min(mask_y_position + 3, self.collision_mask.get_size()[1])):
+                            try:
+                                if self.collision_mask.get_at((x, y_check)):
+                                    has_pixel = True
+                                    break
+                            except IndexError:
+                                pass
+                        
+                        if has_pixel:
+                            if leftmost is None:
+                                leftmost = x
+                            rightmost = x
+                    
+                    # Store platform extents for use in glow effect
+                    if leftmost is not None and rightmost is not None:
+                        self.platform_left = leftmost
+                        self.platform_right = rightmost
+                    
+                    # Draw a single line from leftmost to rightmost solid pixel
+                    if leftmost is not None and rightmost is not None and (rightmost - leftmost) > 5:
+                        # Debug output for first obstacle
+                        if not hasattr(self, '_debug_line'):
+                            self._debug_line = True
+                            print(f"🟡 Platform line: leftmost={leftmost}, rightmost={rightmost}, width={rightmost-leftmost}")
+                            print(f"   Drawing from world x={self.x + leftmost} to x={self.x + rightmost}")
+                            print(f"   Sprite: x={self.x}, width={self.sprite_width}, mask_width={mask_width}")
+                        
+                        # Simple golden line across the platform
+                        pygame.draw.line(screen, (255, 223, 100, 200), 
+                                       (self.x + leftmost, platform_line_y), 
+                                       (self.x + rightmost, platform_line_y), 3)  # Thicker for visibility
+
+                
+                # Draw solid portion below platform (full opacity - landable)
+                if below_height > 0:
+                    below_surface = sprite_to_draw.subsurface(pygame.Rect(0, above_height, self.sprite_width, below_height)).copy()
+                    screen.blit(below_surface, (self.x, platform_line_y))
+            else:
+                # Platform line outside sprite bounds - draw normally
+                screen.blit(sprite_to_draw, (self.x, render_y))
+        else:
+            # No landing platform or regular sprite - draw normally
+            screen.blit(sprite_to_draw, (self.x, render_y))
         
         # Blink effect - brighter overlay
         if self.landing_blink > 0 and self.landing_blink % 2 == 0:
-            blink_surface = pygame.Surface((self.width, squish_height), pygame.SRCALPHA)
+            blink_surface = pygame.Surface((self.sprite_width, squish_height), pygame.SRCALPHA)
             blink_surface.fill((255, 255, 150, 100))  # Yellow tint
-            screen.blit(blink_surface, (self.x, self.y + squish_y_offset))
+            screen.blit(blink_surface, (self.x, render_y))
     
     def _draw_hazard_bar(self, screen):
         """Draw low hazard bar (15px tall) that sits above the grass."""
@@ -440,7 +773,9 @@ class ObstacleGenerator:
         # Update and remove off-screen obstacles FIRST
         for obstacle in self.obstacles[:]:
             obstacle.update()
-            if obstacle.x < -obstacle.width:
+            # For large irregular sprites, use sprite_width for removal check
+            removal_width = obstacle.sprite_width if obstacle.use_sprite_collision else obstacle.width
+            if obstacle.x < -removal_width:
                 self.obstacles.remove(obstacle)
         
         # Then generate new obstacles (which checks for pattern completion)
@@ -457,7 +792,11 @@ class ObstacleGenerator:
         player_is_on_obstacle = False
         
         for obstacle in self.obstacles:
-            obstacle_rect = obstacle.get_rect()
+            # For large irregular sprites, use the full sprite rect for initial collision check
+            if obstacle.use_sprite_collision:
+                obstacle_rect = obstacle.get_sprite_rect()
+            else:
+                obstacle_rect = obstacle.get_rect()
             
             # Quick rect check first for performance
             if not player_rect.colliderect(obstacle_rect):
@@ -516,10 +855,17 @@ class ObstacleGenerator:
                         player_is_on_obstacle = True
                         continue
                     else:
-                        # Side or bottom collision - only deadly if significant overlap (>100 pixels)
-                        overlap_area = obstacle.collision_mask.overlap_area(player.collision_mask, 
-                                                                            (player_rect.x - obstacle.x, 
-                                                                             player_rect.y - obstacle.y))
+                        # Side or bottom collision - deadly!
+                        # For large irregular sprites, need to calculate offset correctly
+                        if obstacle.use_sprite_collision:
+                            sprite_y = obstacle.y - obstacle.sprite_y_offset
+                            offset_x = player_rect.x - obstacle.x
+                            offset_y = player_rect.y - sprite_y
+                        else:
+                            offset_x = player_rect.x - obstacle.x
+                            offset_y = player_rect.y - obstacle.y
+                        
+                        overlap_area = obstacle.collision_mask.overlap_area(player.collision_mask, (offset_x, offset_y))
                         if overlap_area > 100:
                             return True  # Significant side/bottom collision = death
                         # Small side touch - ignore it

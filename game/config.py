@@ -1,6 +1,7 @@
 """
 Game configuration and constants.
 Modify these values to customize gameplay.
+Celeste Runner - Wall-jumping auto-scroller edition.
 """
 
 # Screen settings
@@ -13,42 +14,54 @@ ENABLE_DIRTY_RECTS = False  # Experimental: only update changed regions
 VSYNC = True  # Enable VSync for smoother frame pacing
 HARDWARE_ACCEL = True  # Use hardware acceleration if available
 
-# Colors - cute pastel palette
+# Colors - adapted for wall-jumping aesthetic
 SKY_BLUE = (173, 216, 230)
 SKY_LIGHT = (223, 240, 250)
-GROUND_GREEN = (144, 238, 144)
-GROUND_DARK = (100, 200, 100)
+GROUND_DANGER = (200, 50, 50)  # Lethal floor color
+GROUND_DARK = (150, 30, 30)
 PLAYER_PINK = (255, 182, 193)
 PLAYER_OUTLINE = (255, 150, 170)
-OBSTACLE_PURPLE = (216, 191, 216)
-OBSTACLE_DARK = (180, 150, 180)
+WALL_COLOR = (180, 180, 200)  # Neutral wall color
+WALL_HIGHLIGHT = (220, 220, 240)  # Wall when player can grab
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 YELLOW = (255, 223, 0)
-HEART_RED = (255, 105, 180)
+DEATH_RED = (255, 50, 50)
 
-# Physics settings
-GRAVITY = 0.8
-PLAYER_SPEED = 6
-JUMP_POWER = -15
+# Core Physics - Celeste Runner Style
+GRAVITY = 0.8  # Falling gravity
+WALL_SLIDE_GRAVITY = 0.2  # Slower gravity while sliding on wall
+WALL_JUMP_X_FORCE = 8  # Horizontal speed when jumping off wall
+WALL_JUMP_Y_FORCE = -14  # Vertical speed when jumping off wall
+AIR_RESISTANCE = 0.96  # Multiplier for horizontal velocity each frame
+
+# Auto-scroll settings
+AUTO_SCROLL_SPEED = 3  # Camera moves right automatically (pixels/frame)
+AUTO_SCROLL_ACCELERATION = 0.002  # Speed increases over time
+MAX_AUTO_SCROLL_SPEED = 8  # Maximum scroll speed
 
 # Player settings
-GROUND_Y = 650  # Lower horizon for bigger window (was 450)
+GROUND_Y = 750  # Y position of lethal floor
 PLAYER_SIZE = 40
-PLAYER_START_X = 300  # Moved right for better camera position (was 100)
+PLAYER_START_X = 200  # Start position (camera-relative)
 
-# Obstacle generation settings
-MIN_OBSTACLE_GAP = 150
-MAX_OBSTACLE_GAP = 300
-MIN_OBSTACLE_HEIGHT = 20
-# Max obstacle height is calculated dynamically based on jump physics
+# Wall mechanics
+WALL_CLING_TIME = 8  # Frames player can cling to wall before sliding
+WALL_JUMP_COYOTE_TIME = 6  # Frames after leaving wall to still wall-jump
+WALL_WIDTH = 30  # Default wall thickness
+MIN_WALL_HEIGHT = 60  # Minimum wall height to grab
+MAX_WALL_HEIGHT = 400  # Maximum wall height
+
+# Level generation settings
+MIN_WALL_GAP = 100  # Minimum horizontal distance between walls
+MAX_WALL_GAP = 280  # Maximum horizontal distance between walls
+WALL_SPAWN_DISTANCE = SCREEN_WIDTH + 200  # Spawn walls this far ahead
 
 # Asset paths
 ASSETS_DIR = "assets"
 PLAYER_SPRITE_PATH = f"{ASSETS_DIR}/player.png"
-OBSTACLE_SPRITE_PATH = f"{ASSETS_DIR}/obstacle.png"
+WALL_SPRITE_PATH = f"{ASSETS_DIR}/wall.png"
 BACKGROUND_PATH = f"{ASSETS_DIR}/background.png"
-GROUND_SPRITE_PATH = f"{ASSETS_DIR}/ground.png"
 
 # Font paths
 FONT_DIR = f"{ASSETS_DIR}/fonts"
@@ -56,10 +69,10 @@ FONT_REGULAR = f"{FONT_DIR}/Mochibop-Demo.ttf"
 FONT_BOLD = f"{FONT_DIR}/MochibopBold-Demo.ttf"
 
 # Visual settings
-BACKGROUND_SCROLL_SPEED_MULTIPLIER = 0.3  # Background scrolls at 30% of player speed (parallax effect)
+BACKGROUND_SCROLL_SPEED_MULTIPLIER = 0.3  # Background parallax
 
 # Debug settings
-SHOW_PATTERN_DEBUG = True  # Toggle to show/hide current pattern name
+SHOW_DEBUG_INFO = True  # Show wall positions, player state, etc.
 
 # Game settings
-GAME_TITLE = "Cute Geo Dash 🌟"
+GAME_TITLE = "Celeste Runner 🧗"

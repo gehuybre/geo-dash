@@ -27,9 +27,9 @@ class IrregularSpriteSheetGenerator:
         
         # Different sprite sizes for variety (all multiples of 30 for grid alignment)
         self.sprite_sizes = [
-            (60, 60),   # Small
-            (90, 90),   # Medium
-            (120, 120), # Large
+            (60, 60),   # Small (2x2 grid)
+            (90, 90),   # Medium (3x3 grid)
+            (120, 120), # Large (4x4 grid)
         ]
     
     def generate(self):
@@ -44,12 +44,20 @@ class IrregularSpriteSheetGenerator:
             print(f"No SVG files found in {self.svg_dir}")
             return False
         
-        print(f"\n🎨 Generating irregular obstacle spritesheet from {len(svg_files)} SVGs...")
+        print(f"\n🎨 Generating irregular obstacle spritesheet from {len(svg_files)} individual kawaii SVGs...")
         
-        # Convert SVGs to PNGs at different sizes
+        # Convert each SVG to PNG at ALL sizes for maximum variety
+        # Each kawaii object gets 4 sizes: tiny, small, medium, large
+        # Sizes are 10x larger for better visibility!
         sprites = []
-        for i, svg_file in enumerate(svg_files):
-            for size_idx, (width, height) in enumerate(self.sprite_sizes):
+        for svg_file in svg_files:
+            # Create each kawaii object in multiple sizes
+            for width, height, size_category in [
+                (300, 300, 'tiny'),      # 10x10 grid (was 1x1)
+                (600, 600, 'small'),     # 20x20 grid (was 2x2)
+                (900, 900, 'medium'),    # 30x30 grid (was 3x3)
+                (1200, 1200, 'large'),   # 40x40 grid (was 4x4)
+            ]:
                 try:
                     # Convert SVG to PNG at specific size
                     png_data = cairosvg.svg2png(
@@ -62,8 +70,20 @@ class IrregularSpriteSheetGenerator:
                     from io import BytesIO
                     img = Image.open(BytesIO(png_data)).convert('RGBA')
                     
+                    # Crop to non-transparent bounding box to remove whitespace
+                    bbox = img.getbbox()  # Get bounding box of non-transparent pixels
+                    if bbox:
+                        img = img.crop(bbox)
+                        # Resize back to target size (this will center the shape)
+                        final_img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+                        # Center the cropped image
+                        paste_x = (width - img.width) // 2
+                        paste_y = (height - img.height) // 2
+                        final_img.paste(img, (paste_x, paste_y))
+                        img = final_img
+                    
                     # Store sprite info
-                    sprite_name = f"{svg_file.stem}_{size_idx}"
+                    sprite_name = f"{svg_file.stem}_{size_category}"
                     sprites.append({
                         'name': sprite_name,
                         'image': img,
@@ -71,20 +91,21 @@ class IrregularSpriteSheetGenerator:
                         'height': height,
                         'grid_width': width // 30,  # Grid cells (30px base unit)
                         'grid_height': height // 30,
-                        'size_category': ['small', 'medium', 'large'][size_idx]
+                        'size_category': size_category
                     })
                     
                     print(f"  ✓ {sprite_name}: {width}x{height}px ({width//30}x{height//30} grid)")
                     
                 except Exception as e:
-                    print(f"  ✗ Failed to convert {svg_file.name} at size {width}x{height}: {e}")
+                    print(f"  ✗ Failed to convert {svg_file.name} at {size_category}: {e}")
         
         if not sprites:
             print("No sprites generated!")
             return False
         
         # Calculate optimal sheet layout (simple row packing)
-        sheet_width = 1920  # Same as other spritesheets
+        # Much larger sheet to accommodate 10x sized sprites
+        sheet_width = 4800  # Large enough for big kawaii objects
         current_x = 0
         current_y = 0
         row_height = 0
@@ -143,8 +164,9 @@ class IrregularSpriteSheetGenerator:
 
 
 def main():
+    # Use the extracted individual kawaii objects
     generator = IrregularSpriteSheetGenerator(
-        svg_dir='assets/obstacles/irregular-obstacles',
+        svg_dir='assets/obstacles/extracted-kawaii',
         output_dir='assets/spritesheets'
     )
     
@@ -152,8 +174,8 @@ def main():
     
     if success:
         print("\n📝 Next steps:")
-        print("1. Load this spritesheet in AssetManager")
-        print("2. Create obstacle patterns using these irregular shapes")
+        print("1. Restart the game to see the new kawaii obstacles")
+        print("2. Each of the 27 kawaii objects will be used as obstacles!")
         print("3. Enjoy pixel-perfect collision with variety!")
     
     return 0 if success else 1
