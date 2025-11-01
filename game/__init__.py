@@ -1,9 +1,9 @@
 """
-Game Package - Core game modules
+Game Package - Celeste Runner
 
-Contains the main game logic, rendering, player, obstacles, and configuration.
+Contains the wall-jumping auto-scroller game logic.
 """
 
-from .geo_dash import Game, main
+from .celeste_runner import Game, main
 
 __all__ = ['Game', 'main']

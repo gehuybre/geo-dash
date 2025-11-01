@@ -278,7 +278,12 @@ class Game:
             return
         
         # Update camera (auto-scroll)
+        prev_distance = self.camera.total_distance
         self.camera.update()
+        distance_moved = self.camera.total_distance - prev_distance
+        
+        # Update score manager with distance traveled
+        self.score_manager.update_distance(distance_moved)
         
         # Update player
         self.player.update(self.camera.x)
@@ -316,8 +321,9 @@ class Game:
     
     def _handle_death(self):
         """Handle player death."""
-        score = self.camera.get_score()
-        self.score_manager.check_and_save_high_score(score)
+        # ScoreManager already has the score from update_distance calls
+        self.score_manager.check_and_save_high_score()
+        score = self.score_manager.score
         print(f"💀 Game Over! Score: {score} - {self.death_reason}")
     
     def draw(self):
