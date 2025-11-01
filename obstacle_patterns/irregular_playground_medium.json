@@ -1,0 +1,147 @@
+{
+  "name": "Irregular Playground",
+  "description": "Fun irregular shapes with mixed sizes - 3 shapes at small/medium/large sizes, physics-validated",
+  "obstacles": [
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-1.8",
+      "comment": "Warmup - medium height bar"
+    },
+    {
+      "bar_type": "bar-4-3",
+      "gap_type": "gap-2.0",
+      "comment": "Standard jump"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.5",
+      "comment": "Small obstacle, short gap"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.0",
+      "comment": "Medium obstacle"
+    },
+    {
+      "bar_type": "bar-4-4",
+      "gap_type": "gap-2.25",
+      "comment": "Large obstacle, max gap"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.75",
+      "comment": "Small obstacle"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-1.8",
+      "comment": "Medium width, low height"
+    },
+    {
+      "bar_type": "bar-4-3",
+      "gap_type": "gap-2.1",
+      "comment": "Large obstacle"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-2.0",
+      "comment": "Narrow but tall"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-1.9",
+      "comment": "Medium obstacle"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-1.7",
+      "comment": "Wide but short"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-2.0",
+      "comment": "Small obstacle, long gap"
+    },
+    {
+      "bar_type": "bar-3-4",
+      "gap_type": "gap-2.25",
+      "comment": "Tall obstacle, max gap"
+    },
+    {
+      "bar_type": "bar-4-3",
+      "gap_type": "gap-1.8",
+      "comment": "Large obstacle"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-2.0",
+      "comment": "Narrow tall"
+    },
+    {
+      "bar_type": "bar-3-2",
+      "gap_type": "gap-1.75",
+      "comment": "Medium obstacle"
+    },
+    {
+      "bar_type": "bar-4-4",
+      "gap_type": "gap-2.2",
+      "comment": "Large obstacle"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.6",
+      "comment": "Small obstacle cluster"
+    },
+    {
+      "bar_type": "bar-2-3",
+      "gap_type": "gap-1.8",
+      "comment": "Narrow tall"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-2.1",
+      "comment": "Medium obstacle"
+    },
+    {
+      "bar_type": "bar-4-2",
+      "gap_type": "gap-1.9",
+      "comment": "Wide short"
+    },
+    {
+      "bar_type": "bar-2-4",
+      "gap_type": "gap-2.25",
+      "comment": "Very tall narrow, max gap"
+    },
+    {
+      "bar_type": "bar-3-3",
+      "gap_type": "gap-1.8",
+      "comment": "Medium obstacle"
+    },
+    {
+      "bar_type": "bar-4-3",
+      "gap_type": "gap-2.0",
+      "comment": "Large obstacle"
+    },
+    {
+      "bar_type": "bar-2-2",
+      "gap_type": "gap-1.7",
+      "comment": "Small obstacle"
+    }
+  ],
+  "metadata": {
+    "type": "irregular",
+    "length": 25,
+    "rhythm": "Mixed sizes and shapes - small/medium/large variety",
+    "uses_irregular_sprites": true,
+    "sprite_mapping": {
+      "bar-2-2": "small (60x60px)",
+      "bar-3-3": "medium (90x90px)",
+      "bar-4-4": "large (120x120px)",
+      "bar-2-3": "small/medium mix",
+      "bar-3-2": "medium/small mix",
+      "bar-4-2": "large/small mix",
+      "bar-4-3": "large/medium mix",
+      "bar-2-4": "small/large mix"
+    }
+  }
+}

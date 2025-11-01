@@ -83,6 +83,10 @@ class Player:
         self.has_double_jump = False  # Can use double jump
         self.jumps_used = 0  # Track number of jumps (0, 1, or 2)
         
+        # Coyote time and jump buffering for more responsive controls
+        self.coyote_time = 0  # Frames since leaving ground (allows jump shortly after)
+        self.jump_buffer = 0  # Frames to remember a jump input
+        
         # Landing bonus and combo system
         self.just_landed = False  # Flag for landing bonus
         self.combo_streak = 0  # Number of consecutive platform landings without touching ground
@@ -94,6 +98,14 @@ class Player:
         
         # Try to load custom sprite
         self.custom_sprite = asset_manager.get_player_sprite(character_name)
+        
+        # Create collision mask for pixel-perfect collision
+        self.collision_mask = None
+        if self.custom_sprite:
+            try:
+                self.collision_mask = pygame.mask.from_surface(self.custom_sprite)
+            except:
+                self.collision_mask = None
     
     def set_character(self, character_name):
         """
@@ -106,26 +118,54 @@ class Player:
         self.character_name = character_name
         self.custom_sprite = asset_manager.get_player_sprite(character_name)
         
+        # Update collision mask when changing character
+        if self.custom_sprite:
+            try:
+                self.collision_mask = pygame.mask.from_surface(self.custom_sprite)
+            except:
+                self.collision_mask = None
+        
     def jump(self):
         """Make the player jump (supports double jump)."""
-        # First jump: from ground
-        if self.on_ground and self.jumps_used == 0:
+        # Buffer the jump input for a few frames
+        self.jump_buffer = 5  # Remember jump input for 5 frames
+        
+        # First jump: from ground or within coyote time
+        if (self.on_ground or self.coyote_time > 0) and self.jumps_used == 0:
             self.velocity_y = JUMP_POWER
             self.is_jumping = True
             self.on_ground = False
             self.jumps_used = 1
             self.has_double_jump = True
             self.current_obstacle = None  # Clear obstacle reference when jumping off
+            self.coyote_time = 0  # Use up coyote time
+            self.jump_buffer = 0  # Use up jump buffer
         # Second jump: in mid-air (double jump)
         elif self.has_double_jump and self.jumps_used == 1 and not self.on_ground:
             self.velocity_y = JUMP_POWER * 0.9  # Slightly weaker second jump
             self.jumps_used = 2
             self.has_double_jump = False
+            self.jump_buffer = 0  # Use up jump buffer
     
     def update(self):
         """Update player physics and position."""
         # Don't reset on_ground here - let collision detection handle it
         # This prevents flickering when standing on obstacles
+        
+        # Update coyote time (grace period after leaving ground)
+        if not self.on_ground:
+            self.coyote_time += 1
+            if self.coyote_time > 6:  # 6 frames of coyote time (~100ms at 60fps)
+                self.coyote_time = 6  # Cap it
+        else:
+            self.coyote_time = 0  # Reset when on ground
+        
+        # Update jump buffer (remember jump input)
+        if self.jump_buffer > 0:
+            self.jump_buffer -= 1
+            # Try to execute buffered jump if we just landed
+            if self.on_ground and self.jumps_used == 0:
+                self.jump()
         
         # Reset just_landed flag (will be set by collision if landing)
         self.just_landed = False

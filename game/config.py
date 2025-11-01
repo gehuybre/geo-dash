@@ -38,8 +38,8 @@ PLAYER_SIZE = 40
 PLAYER_START_X = 300  # Moved right for better camera position (was 100)
 
 # Obstacle generation settings
-MIN_OBSTACLE_GAP = 200
-MAX_OBSTACLE_GAP = 400
+MIN_OBSTACLE_GAP = 150
+MAX_OBSTACLE_GAP = 300
 MIN_OBSTACLE_HEIGHT = 20
 # Max obstacle height is calculated dynamically based on jump physics
 

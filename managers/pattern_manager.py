@@ -56,13 +56,21 @@ class PatternManager:
         """
         Resolve bar_type and gap_type references to actual width/height/gap values.
         Supports both legacy format (explicit width/height/gap_after) and new format (bar_type/gap_type).
-        Now also supports floating platforms with y_offset.
+        Now also supports floating platforms with y_offset and irregular sprites.
         """
         obstacles = pattern_data.get('obstacles', [])
         resolved_obstacles = []
         
+        # Check if this pattern prefers irregular sprites
+        metadata = pattern_data.get('metadata', {})
+        uses_irregular = metadata.get('uses_irregular_sprites', False) or metadata.get('type') == 'irregular'
+        
         for obs in obstacles:
             resolved_obs = obs.copy()
+            
+            # Mark if this pattern uses irregular sprites
+            if uses_irregular:
+                resolved_obs['prefer_irregular'] = True
             
             # Check if this obstacle uses bar_type reference
             if 'bar_type' in obs:

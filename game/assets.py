@@ -74,6 +74,21 @@ class AssetManager:
                 print(f"✅ Loaded player character spritesheet ({len(self.spritesheet_metadata['player_characters']['sprites'])} sprites)")
             except Exception as e:
                 print(f"⚠️  Could not load player character spritesheet: {e}")
+        
+        # Load irregular obstacle spritesheet
+        irregular_sheet = f"{spritesheet_dir}/irregular_obstacles.png"
+        irregular_meta = f"{spritesheet_dir}/irregular_obstacles.json"
+        
+        if os.path.exists(irregular_sheet) and os.path.exists(irregular_meta):
+            try:
+                # Load image with pygame - don't convert yet
+                sheet_img = pygame.image.load(irregular_sheet)
+                self.spritesheets['irregular_obstacles'] = sheet_img
+                with open(irregular_meta, 'r') as f:
+                    self.spritesheet_metadata['irregular_obstacles'] = json.load(f)
+                print(f"✅ Loaded irregular obstacle spritesheet ({len(self.spritesheet_metadata['irregular_obstacles']['sprites'])} sprites)")
+            except Exception as e:
+                print(f"⚠️  Could not load irregular obstacle spritesheet: {e}")
     
     def _get_sprite_from_sheet(self, sheet_name, sprite_name, target_size=None):
         """
@@ -281,7 +296,7 @@ class AssetManager:
         
         return characters
     
-    def get_obstacle_sprite(self, width, height):
+    def get_obstacle_sprite(self, width, height, prefer_irregular=False):
         """
         Get obstacle sprite from spritesheet or individual file.
         For 30px base unit (8x8 grid): converts pixel dimensions to grid coordinates.
@@ -290,6 +305,7 @@ class AssetManager:
         Args:
             width: Obstacle width in pixels
             height: Obstacle height in pixels
+            prefer_irregular: If True, try irregular sprites first (for irregular patterns)
             
         Returns:
             pygame.Surface or None if not found
@@ -304,7 +320,13 @@ class AssetManager:
         # Sprite name: {width}-{height}
         sprite_name = f"{grid_width}-{grid_height}"
         
-        # Try to get from spritesheet first
+        # Try irregular sprites first if requested
+        if prefer_irregular and 'irregular_obstacles' in self.spritesheet_metadata:
+            irregular_sprite = self._get_irregular_sprite(grid_width, grid_height, width, height)
+            if irregular_sprite:
+                return irregular_sprite
+        
+        # Try to get from regular spritesheet
         sprite = self._get_sprite_from_sheet('obstacles', sprite_name, (width, height))
         if sprite:
             return sprite
@@ -330,6 +352,43 @@ class AssetManager:
         
         print(f"✗ Obstacle sprite not found: {svg_filename} for {width}x{height}px ({grid_width}x{grid_height} grid)")
         return None
+    
+    def _get_irregular_sprite(self, grid_width, grid_height, target_width, target_height):
+        """
+        Get a random irregular sprite that fits the requested size.
+        
+        Args:
+            grid_width: Width in grid units
+            grid_height: Height in grid units  
+            target_width: Target width in pixels
+            target_height: Target height in pixels
+            
+        Returns:
+            pygame.Surface or None if no matching sprite
+        """
+        import random
+        
+        metadata = self.spritesheet_metadata.get('irregular_obstacles')
+        if not metadata:
+            return None
+        
+        # Find sprites that match the grid size
+        matching_sprites = [
+            s for s in metadata['sprites']
+            if s['grid_width'] == grid_width and s['grid_height'] == grid_height
+        ]
+        
+        if not matching_sprites:
+            return None
+        
+        # Pick a random matching sprite for variety
+        sprite_info = random.choice(matching_sprites)
+        sprite = self._get_sprite_from_sheet('irregular_obstacles', sprite_info['name'], (target_width, target_height))
+        
+        if sprite:
+            print(f"✓ Using irregular sprite: {sprite_info['name']} ({sprite_info['size_category']}) for {grid_width}x{grid_height} grid")
+        
+        return sprite
     
     def _create_composite_sprite(self, grid_width, grid_height, target_width, target_height):
         """

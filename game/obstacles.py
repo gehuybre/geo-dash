@@ -12,7 +12,7 @@ from managers.pattern_manager import PatternManager
 class Obstacle:
     """Single obstacle with custom sprite support and floating platform capability."""
     
-    def __init__(self, x, height, width=30, y_offset=0, is_killzone=False, hazard_type="lava", continuous_lava=False):
+    def __init__(self, x, height, width=30, y_offset=0, is_killzone=False, hazard_type="lava", continuous_lava=False, prefer_irregular=False):
         # Import asset_manager here to avoid circular import issues
         from .assets import asset_manager
         
@@ -40,7 +40,7 @@ class Obstacle:
             self.height = height
             self.y_offset = y_offset  # Offset from ground (0 = ground obstacle, >0 = floating)
             self.y = GROUND_Y + PLAYER_SIZE - height - y_offset
-            self.custom_sprite = asset_manager.get_obstacle_sprite(self.width, self.height)
+            self.custom_sprite = asset_manager.get_obstacle_sprite(self.width, self.height, prefer_irregular=prefer_irregular)
             self.hazard_texture = None
             # Load pattern for tiling
             self.obstacle_pattern = asset_manager.get_obstacle_pattern()
@@ -53,6 +53,14 @@ class Obstacle:
             else:
                 self.pattern_offset_x = 0
                 self.pattern_offset_y = 0
+            
+            # Create collision mask for pixel-perfect collision with irregular shapes
+            self.collision_mask = None
+            if self.custom_sprite:
+                try:
+                    self.collision_mask = pygame.mask.from_surface(self.custom_sprite)
+                except:
+                    self.collision_mask = None
         
         self.passed = False
         
@@ -82,6 +90,85 @@ class Obstacle:
     def get_rect(self):
         """Get collision rectangle."""
         return pygame.Rect(self.x, self.y, self.width, self.height)
+    
+    def check_pixel_collision(self, player_rect, player_mask=None):
+        """
+        Check pixel-perfect collision with player.
+        Returns True if there's a collision, False otherwise.
+        
+        Args:
+            player_rect: pygame.Rect of the player
+            player_mask: pygame.mask.Mask of the player (optional)
+        """
+        if not self.collision_mask:
+            # Fall back to rect collision if no mask available
+            return self.get_rect().colliderect(player_rect)
+        
+        if player_mask:
+            # Pixel-perfect collision with both masks
+            # Add margin to make collision more forgiving (erode the mask slightly)
+            offset = (player_rect.x - self.x, player_rect.y - self.y)
+            
+            # Create a slightly smaller collision area by checking offset
+            # This effectively creates a "safe zone" around the edges
+            overlap = self.collision_mask.overlap(player_mask, offset)
+            if overlap is None:
+                return False
+            
+            # Allow significant overlaps (~10x10 pixels) for more forgiving collisions
+            overlap_area = self.collision_mask.overlap_area(player_mask, offset)
+            return overlap_area > 100  # ~10x10 pixels minimum overlap to count as collision
+        else:
+            # Check if player rect overlaps with any pixel in obstacle mask
+            overlap_rect = self.get_rect().clip(player_rect)
+            if overlap_rect.width == 0 or overlap_rect.height == 0:
+                return False
+            
+            # Check pixels in the overlap area
+            for px in range(overlap_rect.left, overlap_rect.right):
+                for py in range(overlap_rect.top, overlap_rect.bottom):
+                    local_x = px - self.x
+                    local_y = py - self.y
+                    if 0 <= local_x < self.width and 0 <= local_y < self.height:
+                        if self.collision_mask.get_at((local_x, local_y)):
+                            return True
+            return False
+    
+    def can_land_on_top(self, player_rect, player_mask=None):
+        """
+        Check if player can land on top of this obstacle.
+        Uses pixel-perfect detection to find the top surface of irregular shapes.
+        
+        Returns: (can_land, landing_y) tuple
+        """
+        if not self.collision_mask:
+            # Fall back to simple top collision with LARGER safe zone
+            rect = self.get_rect()
+            # Increased from 10 to 25 pixels for more forgiving landings
+            if player_rect.bottom >= rect.top and player_rect.bottom <= rect.top + 25:
+                if player_rect.right > rect.left and player_rect.left < rect.right:
+                    return True, rect.top
+            return False, None
+        
+        # For pixel-perfect collision, find the topmost pixel
+        # Check a column under the player's center
+        player_center_x = player_rect.centerx
+        local_x = player_center_x - self.x
+        
+        if local_x < 0 or local_x >= self.width:
+            return False, None
+        
+        # Find topmost solid pixel in this column
+        for local_y in range(self.height):
+            if self.collision_mask.get_at((int(local_x), local_y)):
+                world_y = self.y + local_y
+                # Check if player is falling onto this point with LARGER safe zone
+                # Increased from 5 to 15 pixels for more forgiving landings
+                if player_rect.bottom >= world_y - 15 and player_rect.bottom <= world_y + 15:
+                    return True, world_y
+                break
+        
+        return False, None
     
     def draw(self, screen):
         """Draw obstacle using custom sprite or procedural generation."""
@@ -323,7 +410,8 @@ class ObstacleGenerator:
                                 # Don't track hazard obstacles for pattern completion
                     
                     # Create the platform/bar
-                    obstacle = Obstacle(current_x, height, width, y_offset, False, 'lava', False)
+                    prefer_irregular = pattern_obstacle.get('prefer_irregular', False)
+                    obstacle = Obstacle(current_x, height, width, y_offset, False, 'lava', False, prefer_irregular)
                     obstacle.pattern_name = pattern_name  # Tag obstacle with pattern name
                     self.obstacles.append(obstacle)
                     self.current_pattern_obstacles.append(obstacle)  # Track for completion
@@ -364,20 +452,80 @@ class ObstacleGenerator:
             obstacle.draw(screen)
     
     def check_collision(self, player):
-        """Check if player collides with obstacles. Hazard bars kill on any contact."""
+        """Check if player collides with obstacles using pixel-perfect detection for irregular shapes."""
         player_rect = player.get_rect()
         player_is_on_obstacle = False
         
         for obstacle in self.obstacles:
             obstacle_rect = obstacle.get_rect()
             
-            # Check if there's any overlap
-            if player_rect.colliderect(obstacle_rect):
-                # Hazard bars (killzones) kill player on ANY contact
-                if obstacle.is_killzone:
-                    return True  # Instant death - no landing allowed
+            # Quick rect check first for performance
+            if not player_rect.colliderect(obstacle_rect):
+                continue
+            
+            # Hazard bars (killzones) kill player on ANY contact
+            if obstacle.is_killzone:
+                return True  # Instant death - no landing allowed
+            
+            # For obstacles with custom sprites, use pixel-perfect collision
+            if obstacle.collision_mask and player.collision_mask:
+                # Check if player can land on top using pixel-perfect detection
+                can_land, landing_y = obstacle.can_land_on_top(player_rect, player.collision_mask)
                 
-                # Regular obstacles: check for landing vs collision
+                if can_land and player.velocity_y >= 0:
+                    # Landing on top - safe!
+                    player.y = landing_y - player.height
+                    player.velocity_y = 0
+                    player.on_ground = True
+                    player.is_jumping = False
+                    player.jumps_used = 0  # Reset double jump on landing
+                    player.has_double_jump = False
+                    player.rotation = 0  # Stop rotation when on obstacle
+                    
+                    # Trigger landing visual effects on the OBSTACLE (only if just landed on NEW obstacle)
+                    if player.current_obstacle != obstacle:  # Landing on a different obstacle
+                        obstacle.trigger_landing_effect()
+                        player.just_landed = True  # Flag for scoring bonus
+                        player.combo_streak += 1  # Increase combo for platform landing
+                        player.last_landed_on_ground = False
+                        player.current_obstacle = obstacle  # Track this obstacle
+                    
+                    player_is_on_obstacle = True
+                    continue
+                elif obstacle.check_pixel_collision(player_rect, player.collision_mask):
+                    # Check if this is a side/bottom collision (deadly) vs top collision (safe)
+                    # If player is descending and near the top, treat as safe landing zone
+                    overlap_from_top = player_rect.bottom - obstacle_rect.top
+                    if player.velocity_y >= 0 and overlap_from_top <= 40:
+                        # Close to landing - give them the benefit of the doubt, set them on top
+                        player.y = obstacle_rect.top - player.height
+                        player.velocity_y = 0
+                        player.on_ground = True
+                        player.is_jumping = False
+                        player.jumps_used = 0
+                        player.has_double_jump = False
+                        player.rotation = 0
+                        
+                        if player.current_obstacle != obstacle:
+                            obstacle.trigger_landing_effect()
+                            player.just_landed = True
+                            player.combo_streak += 1
+                            player.last_landed_on_ground = False
+                            player.current_obstacle = obstacle
+                        
+                        player_is_on_obstacle = True
+                        continue
+                    else:
+                        # Side or bottom collision - only deadly if significant overlap (>100 pixels)
+                        overlap_area = obstacle.collision_mask.overlap_area(player.collision_mask, 
+                                                                            (player_rect.x - obstacle.x, 
+                                                                             player_rect.y - obstacle.y))
+                        if overlap_area > 100:
+                            return True  # Significant side/bottom collision = death
+                        # Small side touch - ignore it
+                        continue
+            else:
+                # Fall back to rectangle collision for obstacles without sprites
                 # Get player's bottom and sides
                 player_bottom = player_rect.bottom
                 player_top = player_rect.top
@@ -395,8 +543,8 @@ class ObstacleGenerator:
                 overlap_right = obstacle_right - player_left
                 
                 # If player is descending and mostly above the obstacle, it's a landing
-                # Larger safe zone (20 pixels) for more forgiving landings, especially on wide blocks
-                if player.velocity_y >= 0 and overlap_bottom <= 20:
+                # Increased safe zone from 20 to 30 pixels for more forgiving landings
+                if player.velocity_y >= 0 and overlap_bottom <= 30:
                     # Landing on top - safe!
                     player.y = obstacle_top - player.height
                     player.velocity_y = 0
@@ -415,7 +563,6 @@ class ObstacleGenerator:
                         player.current_obstacle = obstacle  # Track this obstacle
                     
                     player_is_on_obstacle = True
-                    # No collision, just landing
                     continue
                 else:
                     # Hit the side, bottom, or deep inside obstacle - that's a collision
