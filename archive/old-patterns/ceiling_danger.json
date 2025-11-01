@@ -1,9 +1,0 @@
-{
-  "name": "Ceiling Danger",
-  "description": "Obstacles hanging from above that you must duck under",
-  "obstacles": [
-    {"bar_type": "bar-3-5-2", "gap_type": "gap-1.5"},
-    {"bar_type": "bar-2-6-1.5", "gap_type": "gap-1.5"},
-    {"bar_type": "bar-3-5-2", "gap_type": "gap-2"}
-  ]
-}
