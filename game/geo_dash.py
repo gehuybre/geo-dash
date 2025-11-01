@@ -43,8 +43,9 @@ class Game:
         self.running = True
         self.game_over = False
         self.paused = False
-        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Switch Player, 3=Difficulty, 4=Main Menu
-        self.game_over_menu_option = 0  # 0=Restart, 1=Switch Player
+        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Switch Player, 3=Difficulty, 4=Profile
+        self.game_over_menu_option = 0  # 0=Restart, 1=Switch Player, 2=Profile
+        self.showing_profile = False  # New state for showing profile page
         self.difficulty = None  # Will be set by menu
         self.player_name = None  # Will be set by name selection
         
@@ -56,9 +57,9 @@ class Game:
         
         # Initialize game systems with selected difficulty and player name
         self.player = Player(PLAYER_START_X, GROUND_Y)
-        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
-        self.renderer = Renderer(self.screen)
         self.score_manager = ScoreManager(player_name=self.player_name)
+        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty, score_manager=self.score_manager)
+        self.renderer = Renderer(self.screen)
         self.input_handler = InputHandler()
         
         # Visual effects manager
@@ -328,12 +329,16 @@ class Game:
             # Normal gameplay
             if self.input_handler.is_jump_pressed():
                 self.player.jump()
+        elif self.showing_profile:
+            # Profile page - press SPACE or ESC to go back
+            if self.input_handler.is_select_pressed() or self.input_handler.is_jump_pressed() or self.input_handler.is_pause_pressed():
+                self.showing_profile = False
         else:
             # Game over menu navigation
             if self.input_handler.is_up_pressed():
-                self.game_over_menu_option = (self.game_over_menu_option - 1) % 2  # 2 options
+                self.game_over_menu_option = (self.game_over_menu_option - 1) % 3  # 3 options now
             elif self.input_handler.is_down_pressed():
-                self.game_over_menu_option = (self.game_over_menu_option + 1) % 2  # 2 options
+                self.game_over_menu_option = (self.game_over_menu_option + 1) % 3  # 3 options now
             elif self.input_handler.is_select_pressed() or self.input_handler.is_jump_pressed():
                 self.handle_game_over_selection()
         
@@ -348,6 +353,8 @@ class Game:
             self.player_name = self.show_name_selection()
             self.score_manager = ScoreManager(player_name=self.player_name)
             self.reset_game()
+        elif self.game_over_menu_option == 2:  # Profile
+            self.showing_profile = True
     
     def handle_pause_menu_selection(self):
         """Handle pause menu option selection."""
@@ -365,12 +372,9 @@ class Game:
             self.paused = False
             self.difficulty = self.show_difficulty_menu()
             self.reset_game()
-        elif self.pause_menu_option == 4:  # Main Menu (restart with everything)
-            self.paused = False
-            self.player_name = self.show_name_selection()
-            self.score_manager = ScoreManager(player_name=self.player_name)
-            self.difficulty = self.show_difficulty_menu()
-            self.reset_game()
+        elif self.pause_menu_option == 4:  # Profile
+            self.showing_profile = True
+
 
     
     def reset_game(self):
@@ -379,9 +383,9 @@ class Game:
         
         self.game_over = False
         self.player = Player(PLAYER_START_X, GROUND_Y)
-        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
-        self.renderer = Renderer(self.screen)
         self.score_manager.reset()
+        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty, score_manager=self.score_manager)
+        self.renderer = Renderer(self.screen)
         self.effects.clear()  # Clear all visual effects
     
     def update(self):
@@ -444,12 +448,22 @@ class Game:
         # Draw all visual effects (popups, streaks, particles)
         self.effects.draw(self.screen)
         
+        # Get pattern stats for current pattern
+        pattern_stats = None
+        if self.obstacle_generator.current_pattern_name:
+            pattern_stats = self.score_manager.get_pattern_stats(self.obstacle_generator.current_pattern_name)
+        
         self.renderer.draw_ui(score, high_score, 
                              show_instructions=(score < 5 and not self.game_over and not self.paused),
                              current_pattern=self.obstacle_generator.current_pattern_name,
-                             player_name=self.player_name)
+                             player_name=self.player_name,
+                             pattern_stats=pattern_stats)
         
-        if self.paused:
+        if self.showing_profile:
+            # Get all pattern stats from global data using the new method
+            all_pattern_stats = self.score_manager.get_all_pattern_stats()
+            self.renderer.draw_player_profile(self.player_name, high_score, all_pattern_stats)
+        elif self.paused:
             self.renderer.draw_pause_menu(self.pause_menu_option)
         elif self.game_over:
             self.renderer.draw_game_over(score, self.game_over_menu_option)

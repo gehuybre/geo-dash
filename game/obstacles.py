@@ -20,6 +20,7 @@ class Obstacle:
         self.is_killzone = is_killzone  # Hazard floor marker
         self.hazard_type = hazard_type  # "lava" or "acid"
         self.continuous_lava = continuous_lava  # If True, extend to viewport bottom
+        self.pattern_name = None  # Will be set by ObstacleGenerator for pattern tracking
         
         # Hazard floors always fill from grass to bottom for visual consistency  
         if is_killzone:
@@ -161,11 +162,13 @@ class Obstacle:
 class ObstacleGenerator:
     """Generates obstacles that are always jumpable, using patterns and random generation."""
     
-    def __init__(self, difficulty="hard"):
+    def __init__(self, difficulty="hard", score_manager=None):
         self.obstacles = []
         self.difficulty = difficulty  # "easy", "medium", or "hard"
         self.pattern_manager = PatternManager(difficulty=difficulty)
         self.current_pattern_name = None  # Track current pattern for debugging
+        self.score_manager = score_manager  # For tracking pattern stats
+        self.current_pattern_obstacles = []  # Track obstacles from current pattern
 
         
     def generate_obstacle(self):
@@ -188,8 +191,23 @@ class ObstacleGenerator:
             # Use patterns 100% of the time (no random generation)
             pattern = self.pattern_manager.get_random_pattern()
             if pattern:
+                # If there was a previous pattern, mark it as completed
+                # (since we're starting a new one, the player must have survived the previous one)
+                if self.current_pattern_name and self.score_manager:
+                    self.score_manager.complete_pattern(self.current_pattern_name)
+                    print(f"✅✅✅ PATTERN COMPLETED: {self.current_pattern_name} ✅✅✅")
+                
                 # Start a new pattern - spawn ALL obstacles at once
-                self.current_pattern_name = pattern.get('name', 'Unknown Pattern')
+                pattern_name = pattern.get('name', 'Unknown Pattern')
+                print(f"🆕 Starting new pattern: {pattern_name}")
+                self.current_pattern_name = pattern_name
+                
+                # Track pattern start with score manager
+                if self.score_manager:
+                    self.score_manager.start_pattern(pattern_name)
+                
+                # Clear previous pattern obstacle tracking
+                self.current_pattern_obstacles = []
                 
                 # Calculate initial spawn position
                 if len(self.obstacles) > 0:
@@ -230,10 +248,13 @@ class ObstacleGenerator:
                                     continuous_lava=False  # Regular 15px bars for now
                                 )
                                 self.obstacles.append(lava_obstacle)
+                                # Don't track hazard obstacles for pattern completion
                     
                     # Create the platform/bar
                     obstacle = Obstacle(current_x, height, width, y_offset, False, 'lava', False)
+                    obstacle.pattern_name = pattern_name  # Tag obstacle with pattern name
                     self.obstacles.append(obstacle)
+                    self.current_pattern_obstacles.append(obstacle)  # Track for completion
                     
                     # If this is a floating platform (y_offset > 0), create hazard floor below it
                     # using the hazard type from the gap to its left
@@ -248,6 +269,7 @@ class ObstacleGenerator:
                             continuous_lava=False
                         )
                         self.obstacles.append(floor_obstacle)
+                        # Don't track hazard obstacles for pattern completion
                     
                     # Move x position forward for next obstacle in pattern
                     current_x += width + gap_after
@@ -255,13 +277,14 @@ class ObstacleGenerator:
     
     def update(self):
         """Update all obstacles and generate new ones."""
-        self.generate_obstacle()
-        
-        # Update and remove off-screen obstacles
+        # Update and remove off-screen obstacles FIRST
         for obstacle in self.obstacles[:]:
             obstacle.update()
             if obstacle.x < -obstacle.width:
                 self.obstacles.remove(obstacle)
+        
+        # Then generate new obstacles (which checks for pattern completion)
+        self.generate_obstacle()
     
     def draw(self, screen):
         """Draw all obstacles."""

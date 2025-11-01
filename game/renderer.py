@@ -165,56 +165,99 @@ class Renderer:
                            (x, GROUND_Y + PLAYER_SIZE), 
                            (x, GROUND_Y + PLAYER_SIZE - grass_height), 2)
     
-    def draw_ui(self, score, high_score, show_instructions=False, current_pattern=None, player_name=None):
-        """Draw score and UI elements."""
+    def draw_ui(self, score, high_score, show_instructions=False, current_pattern=None, player_name=None, pattern_stats=None):
+        """Draw score and UI elements.
+        pattern_stats: tuple of (attempts, completions, success_rate) for current pattern
+        """
         if not self.font_available:
             # Draw simple text blocks when font is not available
             if player_name:
-                self._draw_simple_text(f"Player: {player_name}", 20, 10)
+                self._draw_simple_text(f"Speler: {player_name}", 20, 10)
                 self._draw_simple_text(f"Score: {score}", 20, 35)
-                self._draw_simple_text(f"Best: {high_score}", 20, 60)
+                self._draw_simple_text(f"Beste: {high_score}", 20, 60)
             else:
                 self._draw_simple_text(f"Score: {score}", 20, 10)
-                self._draw_simple_text(f"Best: {high_score}", 20, 50)
+                self._draw_simple_text(f"Beste: {high_score}", 20, 50)
             if show_instructions:
-                self._draw_simple_text("Press SPACE to jump!", SCREEN_WIDTH // 2 - 150, 10)
+                self._draw_simple_text("Druk SPATIE om te springen!", SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2)
             # Pattern debug info
             if SHOW_PATTERN_DEBUG and current_pattern:
-                self._draw_simple_text(f"Pattern: {current_pattern}", 20, 90, color=BLACK)
+                pattern_text = f"Patroon: {current_pattern}"
+                if pattern_stats:
+                    attempts, completions, success_rate = pattern_stats
+                    # Add medal emoji based on completions
+                    medal = self._get_medal_emoji(completions)
+                    pattern_text += f" {medal} ({completions}/{attempts} = {success_rate:.0f}%)"
+                self._draw_simple_text(pattern_text, 20, 90, color=BLACK)
         else:
             # Player name (if provided) - compact layout on one line with score
             y_offset = 15
+            x_offset = 300  # Move UI more to the right to avoid being cut off
+            
             if player_name:
                 player_text = self.font.render(f"🎮 {player_name}", True, HEART_RED)
-                self.screen.blit(player_text, (20, y_offset))
+                self.screen.blit(player_text, (x_offset, y_offset))
                 
                 # Score on same line, to the right of player name
                 score_text = self.font.render(f"Score: {score}", True, BLACK)
-                score_x = 20 + player_text.get_width() + 30  # 30px spacing
+                score_x = x_offset + player_text.get_width() + 30  # 30px spacing
                 self.screen.blit(score_text, (score_x, y_offset))
                 
                 # High score on same line, to the right of score
-                high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
+                high_score_text = self.font.render(f"Beste: {high_score}", True, BLACK)
                 high_score_x = score_x + score_text.get_width() + 30
                 self.screen.blit(high_score_text, (high_score_x, y_offset))
             else:
                 # No player name - just score and high score
                 score_text = self.font.render(f"Score: {score}", True, BLACK)
-                self.screen.blit(score_text, (20, y_offset))
+                self.screen.blit(score_text, (x_offset, y_offset))
                 
-                high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
-                high_score_x = 20 + score_text.get_width() + 30
+                high_score_text = self.font.render(f"Beste: {high_score}", True, BLACK)
+                high_score_x = x_offset + score_text.get_width() + 30
                 self.screen.blit(high_score_text, (high_score_x, y_offset))
             
-            # Instructions
+            # Instructions - centered vertically in middle of screen
             if show_instructions:
-                instruction_text = self.font.render("Press SPACE to jump!", True, BLACK)
-                self.screen.blit(instruction_text, (SCREEN_WIDTH // 2 - 150, 15))
+                instruction_text = self.font.render("Druk SPATIE om te springen!", True, BLACK)
+                text_rect = instruction_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+                # Draw background box for better visibility
+                bg_rect = pygame.Rect(text_rect.x - 20, text_rect.y - 10, text_rect.width + 40, text_rect.height + 20)
+                pygame.draw.rect(self.screen, (255, 255, 255, 200), bg_rect, border_radius=10)
+                pygame.draw.rect(self.screen, BLACK, bg_rect, 3, border_radius=10)
+                self.screen.blit(instruction_text, text_rect)
             
-            # Pattern debug info (below main UI)
+            # Pattern debug info (below main UI) - now includes stats with medals
             if SHOW_PATTERN_DEBUG and current_pattern:
-                pattern_text = self.font.render(f"Pattern: {current_pattern}", True, BLACK)
-                self.screen.blit(pattern_text, (20, 55))
+                pattern_text = f"Patroon: {current_pattern}"
+                if pattern_stats:
+                    attempts, completions, success_rate = pattern_stats
+                    # Add medal based on completions
+                    medal = self._get_medal_emoji(completions)
+                    # Color code based on success rate
+                    if success_rate >= 80:
+                        color = (0, 200, 0)  # Green - easy
+                    elif success_rate >= 50:
+                        color = (255, 165, 0)  # Orange - medium
+                    else:
+                        color = (255, 0, 0)  # Red - hard
+                    
+                    pattern_text += f" {medal} [{completions}/{attempts} = {success_rate:.0f}%]"
+                    pattern_render = self.font.render(pattern_text, True, color)
+                else:
+                    pattern_render = self.font.render(pattern_text, True, BLACK)
+                
+                self.screen.blit(pattern_render, (x_offset, 55))
+    
+    def _get_medal_emoji(self, completions):
+        """Get medal emoji based on number of completions."""
+        if completions == 0:
+            return ""  # No medal
+        elif completions == 1:
+            return "🥉"  # Bronze
+        elif completions == 2:
+            return "🥈"  # Silver
+        else:
+            return "🥇"  # Gold for 3+
     
     def _draw_simple_text(self, text, x, y, color=BLACK, size=16):
         """Draw simple pixel text when pygame.font is not available."""
@@ -286,12 +329,12 @@ class Renderer:
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
         
-        menu_options = ["Restart", "Switch Player"]
+        menu_options = ["Opnieuw", "Wissel Speler", "Speler Profiel"]
         
         if not self.font_available:
             # Simple fallback rendering
-            self._draw_simple_text("Game Over!", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 100, HEART_RED, 24)
-            self._draw_simple_text(f"Final Score: {score}", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 40, WHITE, 18)
+            self._draw_simple_text("Spel Over!", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 100, HEART_RED, 24)
+            self._draw_simple_text(f"Eindstand: {score}", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 40, WHITE, 18)
             
             for i, option in enumerate(menu_options):
                 y = SCREEN_HEIGHT // 2 + 20 + i * 50
@@ -299,15 +342,15 @@ class Renderer:
                 prefix = "> " if i == selected_option else "  "
                 self._draw_simple_text(f"{prefix}{option}", SCREEN_WIDTH // 2 - 80, y, color, 18)
             
-            self._draw_simple_text("Use Arrow Keys + SPACE", SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 + 150, SKY_LIGHT, 14)
+            self._draw_simple_text("Gebruik Pijltjestoetsen + SPATIE", SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 + 150, SKY_LIGHT, 14)
         else:
             # Game Over text
-            game_over_text = self.big_font.render("Game Over! 💫", True, HEART_RED)
+            game_over_text = self.big_font.render("Spel Over! 💫", True, HEART_RED)
             text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100))
             self.screen.blit(game_over_text, text_rect)
             
             # Final score
-            score_text = self.font.render(f"Final Score: {score}", True, WHITE)
+            score_text = self.font.render(f"Eindstand: {score}", True, WHITE)
             score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
             self.screen.blit(score_text, score_rect)
             
@@ -331,23 +374,23 @@ class Renderer:
                 self.screen.blit(option_text, option_rect)
             
             # Instructions
-            hint_text = self.font.render("↑/↓ to select, SPACE to confirm", True, SKY_LIGHT)
-            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 170))
+            hint_text = self.font.render("↑/↓ om te selecteren, SPATIE om te bevestigen", True, SKY_LIGHT)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 200))
             self.screen.blit(hint_text, hint_rect)
     
     def draw_pause_menu(self, selected_option):
-        """Draw pause menu with options: Resume, Restart, Switch Player, Select Difficulty, Main Menu."""
+        """Draw pause menu with options: Resume, Restart, Switch Player, Select Difficulty, Player Profile."""
         # Semi-transparent overlay
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(180)
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
         
-        menu_options = ["Resume", "Restart", "Switch Player", "Select Difficulty", "Main Menu"]
+        menu_options = ["Hervatten", "Opnieuw", "Wissel Speler", "Kies Moeilijkheid", "Speler Profiel"]
         
         if not self.font_available:
             # Simple fallback rendering
-            self._draw_simple_text("PAUSED", SCREEN_WIDTH // 2 - 60, 150, YELLOW, 24)
+            self._draw_simple_text("GEPAUZEERD", SCREEN_WIDTH // 2 - 80, 150, YELLOW, 24)
             
             for i, option in enumerate(menu_options):
                 y = 250 + i * 60
@@ -355,10 +398,10 @@ class Renderer:
                 prefix = "> " if i == selected_option else "  "
                 self._draw_simple_text(f"{prefix}{option}", SCREEN_WIDTH // 2 - 120, y, color, 18)
             
-            self._draw_simple_text("Use Arrow Keys + SPACE", SCREEN_WIDTH // 2 - 140, 500, SKY_LIGHT, 14)
+            self._draw_simple_text("Gebruik Pijltjestoetsen + SPATIE", SCREEN_WIDTH // 2 - 140, 500, SKY_LIGHT, 14)
         else:
             # Pause title
-            pause_text = self.big_font.render("⏸ PAUSED", True, YELLOW)
+            pause_text = self.big_font.render("⏸ GEPAUZEERD", True, YELLOW)
             pause_rect = pause_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
             self.screen.blit(pause_text, pause_rect)
             
@@ -382,6 +425,76 @@ class Renderer:
                 self.screen.blit(option_text, option_rect)
             
             # Controls hint
-            hint_text = self.font.render("Use ↑↓ Arrow Keys + SPACE or ESC to Resume", True, SKY_LIGHT)
+            hint_text = self.font.render("Gebruik ↑↓ Pijltjestoetsen + SPATIE of ESC om te hervatten", True, SKY_LIGHT)
             hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+            self.screen.blit(hint_text, hint_rect)
+    
+    def draw_player_profile(self, player_name, high_score, pattern_stats):
+        """Draw player profile page showing achievements and pattern statistics.
+        pattern_stats: dict of {pattern_name: {'attempts': X, 'completions': Y}}
+        """
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(200)
+        overlay.fill((20, 20, 40))
+        self.screen.blit(overlay, (0, 0))
+        
+        if not self.font_available:
+            self._draw_simple_text(f"Profiel: {player_name}", SCREEN_WIDTH // 2 - 150, 50, WHITE, 24)
+            self._draw_simple_text(f"Hoogste Score: {high_score}", SCREEN_WIDTH // 2 - 150, 100, YELLOW, 18)
+            self._draw_simple_text("Druk SPATIE om terug te gaan", SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT - 50, SKY_LIGHT, 14)
+        else:
+            # Profile header
+            title_text = self.big_font.render(f"🎮 Profiel: {player_name}", True, HEART_RED)
+            title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 80))
+            self.screen.blit(title_text, title_rect)
+            
+            # High score
+            score_text = self.font.render(f"Hoogste Score: {high_score}", True, YELLOW)
+            score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 140))
+            self.screen.blit(score_text, score_rect)
+            
+            # Achievements section
+            achievements_text = self.font.render("Prestaties:", True, WHITE)
+            self.screen.blit(achievements_text, (100, 200))
+            
+            # Pattern statistics
+            if pattern_stats:
+                y = 250
+                sorted_patterns = sorted(pattern_stats.items(), key=lambda x: x[1].get('completions', 0), reverse=True)
+                
+                # Show top 10 patterns
+                for i, (pattern_name, stats) in enumerate(sorted_patterns[:10]):
+                    if y > SCREEN_HEIGHT - 100:
+                        break
+                    
+                    attempts = stats.get('attempts', 0)
+                    completions = stats.get('completions', 0)
+                    success_rate = (completions / attempts * 100) if attempts > 0 else 0
+                    
+                    # Get medal
+                    medal = self._get_medal_emoji(completions)
+                    
+                    # Color based on success rate
+                    if success_rate >= 80:
+                        color = (0, 200, 0)
+                    elif success_rate >= 50:
+                        color = (255, 165, 0)
+                    else:
+                        color = (200, 200, 200)
+                    
+                    # Draw pattern stats
+                    pattern_text = self.font.render(
+                        f"{medal} {pattern_name}: {completions}/{attempts} ({success_rate:.0f}%)",
+                        True, color
+                    )
+                    self.screen.blit(pattern_text, (120, y))
+                    y += 40
+            else:
+                no_stats_text = self.font.render("Nog geen patronen voltooid!", True, WHITE)
+                self.screen.blit(no_stats_text, (120, 250))
+            
+            # Instructions
+            hint_text = self.font.render("Druk SPATIE of ESC om terug te gaan", True, SKY_LIGHT)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50))
             self.screen.blit(hint_text, hint_rect)

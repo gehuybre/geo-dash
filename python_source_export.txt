@@ -1,0 +1,4554 @@
+========================================
+GEO DASH - PYTHON SOURCE CODE EXPORT
+Generated: Sat Nov  1 00:40:58 CET 2025
+========================================
+
+
+========================================
+FILE: ./core/__init__.py
+========================================
+
+"""Core game modules."""
+
+
+========================================
+FILE: ./core/physics.py
+========================================
+
+"""
+Physics calculations for jump mechanics and obstacle validation.
+"""
+
+from game.config import GRAVITY, JUMP_POWER, PLAYER_SPEED, MIN_OBSTACLE_HEIGHT, GROUND_Y
+
+
+class PhysicsCalculator:
+    """Calculates jump physics for obstacle generation and validation."""
+    
+    def __init__(self):
+        # Calculate max jumpable height based on jump physics
+        # Maximum height = (jump_power^2) / (2 * gravity)
+        max_jump_height = (abs(JUMP_POWER) ** 2) / (2 * GRAVITY)
+        self.max_obstacle_height = int(max_jump_height * 0.7)  # 70% of max height for safety
+        self.min_obstacle_height = MIN_OBSTACLE_HEIGHT
+        
+        # Calculate horizontal jump distance (time in air * horizontal speed)
+        # Time to reach max height: time = jump_power / gravity
+        time_to_peak = abs(JUMP_POWER) / GRAVITY
+        total_air_time = time_to_peak * 2  # Up and down
+        self.max_jump_distance = int(total_air_time * PLAYER_SPEED)
+        
+        # Minimum gap needed to land safely (accounting for jump recovery time)
+        # Player needs a few frames to land and jump again
+        self.min_safe_gap = int(PLAYER_SPEED * 10)  # 10 frames to recover
+        
+        print(f"Physics: Max jump height={self.max_obstacle_height}px, "
+              f"Max jump distance={self.max_jump_distance}px, "
+              f"Min safe gap={self.min_safe_gap}px")
+    
+    def can_jump_over(self, height, gap):
+        """Check if a jump can clear an obstacle of given height and gap."""
+        if height > self.max_obstacle_height:
+            return False
+        if gap > self.max_jump_distance:
+            return False
+        return True
+    
+    def can_land_safely(self, gap, platform_width):
+        """Check if landing on a platform is safe given the gap and platform width."""
+        # Very wide platforms are always safe
+        if platform_width >= 60:
+            return True
+        # Regular platforms need minimum safe gap
+        return gap >= self.min_safe_gap
+    
+    def can_climb(self, height_diff):
+        """Check if player can jump UP onto a stacked obstacle."""
+        # Can jump up to 60% of max height from current position
+        return height_diff <= self.max_obstacle_height * 0.6
+    
+    def can_forward_jump_up(self, vertical_diff):
+        """Check if player can jump UP while jumping forward (gap jump)."""
+        # When jumping forward, we can't jump as high
+        max_forward_jump_height = self.max_obstacle_height * 0.4
+        return abs(vertical_diff) <= max_forward_jump_height
+
+
+# Global physics calculator instance
+physics = PhysicsCalculator()
+
+
+========================================
+FILE: ./game/__init__.py
+========================================
+
+"""
+Game Package - Core game modules
+
+Contains the main game logic, rendering, player, obstacles, and configuration.
+"""
+
+from .geo_dash import Game, main
+
+__all__ = ['Game', 'main']
+
+
+========================================
+FILE: ./game/assets.py
+========================================
+
+"""
+Asset management system for loading custom sprites and images.
+Falls back to procedural generation if assets are not found.
+"""
+
+import pygame
+import os
+from .config import *
+
+# Try to import PIL for better image loading support
+try:
+    from PIL import Image as PILImage
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+    print("Warning: PIL/Pillow not available, only BMP files supported")
+
+
+class AssetManager:
+    """Manages loading and caching of game assets."""
+    
+    def __init__(self):
+        self.assets = {}
+        self.use_custom_assets = True
+        
+    def load_image(self, path, size=None):
+        """
+        Load an image from the given path.
+        Uses PIL/Pillow if available for better format support.
+        
+        Args:
+            path: Path to the image file
+            size: Optional tuple (width, height) to resize the image
+            
+        Returns:
+            pygame.Surface or None if file not found
+        """
+        if path in self.assets:
+            return self.assets[path]
+        
+        if not os.path.exists(path):
+            return None
+        
+        try:
+            # If PIL is available, use it to load and convert images
+            if HAS_PIL and not path.lower().endswith('.bmp'):
+                pil_image = PILImage.open(path)
+                # Convert to RGB mode
+                if pil_image.mode != 'RGB':
+                    pil_image = pil_image.convert('RGB')
+                # Resize if requested
+                if size:
+                    pil_image = pil_image.resize(size, PILImage.Resampling.LANCZOS)
+                # Convert PIL image to pygame surface
+                mode = pil_image.mode
+                size_tuple = pil_image.size
+                data = pil_image.tobytes()
+                image = pygame.image.fromstring(data, size_tuple, mode)
+            else:
+                # Fall back to pygame's native loading (BMP only without SDL_image)
+                image = pygame.image.load(path)
+                # Convert to pygame surface format
+                if image.get_alpha():
+                    image = image.convert_alpha()
+                else:
+                    image = image.convert()
+                
+                if size:
+                    image = pygame.transform.scale(image, size)
+            
+            self.assets[path] = image
+            return image
+        except (pygame.error, Exception) as e:
+            print(f"Could not load image {path}: {e}")
+            return None
+    
+    def get_player_sprite(self):
+        """Get player sprite, returns None to use procedural generation."""
+        return self.load_image(PLAYER_SPRITE_PATH, (PLAYER_SIZE, PLAYER_SIZE))
+    
+    def get_obstacle_sprite(self, width, height):
+        """Get obstacle sprite, returns None to use procedural generation."""
+        sprite = self.load_image(OBSTACLE_SPRITE_PATH)
+        if sprite:
+            return pygame.transform.scale(sprite, (width, height))
+        return None
+    
+    def get_background_image(self):
+        """Get background image, returns None to use procedural generation."""
+        return self.load_image(BACKGROUND_PATH, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    
+    def get_background_images(self):
+        """Get all background images from the backgrounds folder."""
+        backgrounds = []
+        backgrounds_dir = f"{ASSETS_DIR}/backgrounds"
+        
+        if os.path.exists(backgrounds_dir) and os.path.isdir(backgrounds_dir):
+            # Load all image files from the backgrounds directory
+            image_files = [f for f in os.listdir(backgrounds_dir) 
+                          if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))]
+            
+            print(f"Found {len(image_files)} potential background images: {image_files}")
+            
+            for filename in sorted(image_files):
+                path = os.path.join(backgrounds_dir, filename)
+                print(f"Attempting to load: {path}")
+                bg = self.load_image(path, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                if bg:
+                    print(f"✓ Successfully loaded: {filename}")
+                    backgrounds.append(bg)
+                else:
+                    print(f"✗ Failed to load: {filename}")
+        else:
+            print(f"Backgrounds directory not found: {backgrounds_dir}")
+        
+        # If no backgrounds found, try single background.png
+        if len(backgrounds) == 0:
+            print("No backgrounds loaded from folder, trying single background.png")
+            single_bg = self.get_background_image()
+            if single_bg:
+                backgrounds.append(single_bg)
+        
+        print(f"Total backgrounds loaded: {len(backgrounds)}")
+        return backgrounds if len(backgrounds) > 0 else None
+    
+    def get_ground_sprite(self):
+        """Get ground sprite for tiling, returns None to use procedural generation."""
+        return self.load_image(GROUND_SPRITE_PATH)
+    
+    def get_hazard_texture(self, hazard_type="lava"):
+        """
+        Get hazard floor texture.
+        
+        Args:
+            hazard_type: "lava" or "acid"
+            
+        Returns:
+            pygame.Surface or None if not found
+        """
+        hazard_paths = {
+            "lava": f"{ASSETS_DIR}/hazards/lava.jpg",
+            "acid": f"{ASSETS_DIR}/hazards/acid.png",
+        }
+        
+        # Default to lava if unknown type
+        path = hazard_paths.get(hazard_type, hazard_paths["lava"])
+        return self.load_image(path)
+
+
+# Global asset manager instance
+asset_manager = AssetManager()
+
+
+========================================
+FILE: ./game/config.py
+========================================
+
+"""
+Game configuration and constants.
+Modify these values to customize gameplay.
+"""
+
+# Screen settings
+SCREEN_WIDTH = 1600
+SCREEN_HEIGHT = 900
+FPS = 60
+
+# Colors - cute pastel palette
+SKY_BLUE = (173, 216, 230)
+SKY_LIGHT = (223, 240, 250)
+GROUND_GREEN = (144, 238, 144)
+GROUND_DARK = (100, 200, 100)
+PLAYER_PINK = (255, 182, 193)
+PLAYER_OUTLINE = (255, 150, 170)
+OBSTACLE_PURPLE = (216, 191, 216)
+OBSTACLE_DARK = (180, 150, 180)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+YELLOW = (255, 223, 0)
+HEART_RED = (255, 105, 180)
+
+# Physics settings
+GRAVITY = 0.8
+PLAYER_SPEED = 6
+JUMP_POWER = -15
+
+# Player settings
+GROUND_Y = 650  # Lower horizon for bigger window (was 450)
+PLAYER_SIZE = 40
+PLAYER_START_X = 300  # Moved right for better camera position (was 100)
+
+# Obstacle generation settings
+MIN_OBSTACLE_GAP = 200
+MAX_OBSTACLE_GAP = 400
+MIN_OBSTACLE_HEIGHT = 20
+# Max obstacle height is calculated dynamically based on jump physics
+
+# Asset paths
+ASSETS_DIR = "assets"
+PLAYER_SPRITE_PATH = f"{ASSETS_DIR}/player.png"
+OBSTACLE_SPRITE_PATH = f"{ASSETS_DIR}/obstacle.png"
+BACKGROUND_PATH = f"{ASSETS_DIR}/background.png"
+GROUND_SPRITE_PATH = f"{ASSETS_DIR}/ground.png"
+
+# Font paths
+FONT_DIR = f"{ASSETS_DIR}/fonts"
+FONT_REGULAR = f"{FONT_DIR}/Mochibop-Demo.ttf"
+FONT_BOLD = f"{FONT_DIR}/MochibopBold-Demo.ttf"
+
+# Visual settings
+BACKGROUND_SCROLL_SPEED_MULTIPLIER = 0.3  # Background scrolls at 30% of player speed (parallax effect)
+
+# Debug settings
+SHOW_PATTERN_DEBUG = True  # Toggle to show/hide current pattern name
+
+# Game settings
+GAME_TITLE = "Cute Geo Dash 🌟"
+
+
+========================================
+FILE: ./game/geo_dash.py
+========================================
+
+"""
+Cute Geo Dash - A modular, customizable Geometry Dash clone.
+Main game file that coordinates all game systems.
+"""
+
+import pygame
+import os
+
+# Initialize Pygame first
+pygame.init()
+
+from .config import *
+from .player import Player
+from .obstacles import ObstacleGenerator
+from .visual_effects import VisualEffectsManager
+from managers.score_manager import ScoreManager
+from systems.input_handler import InputHandler
+
+
+def _load_font(size, bold=False):
+    """Helper to load custom font or fallback to system font."""
+    try:
+        font_path = FONT_BOLD if bold and os.path.exists(FONT_BOLD) else FONT_REGULAR
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+    except:
+        return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+
+
+class Game:
+    """Main game class coordinating all systems."""
+    
+    def __init__(self):
+        # Import renderer here after pygame is fully initialized
+        from .renderer import Renderer
+        
+        # Set up borderless fullscreen window
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.NOFRAME)
+        pygame.display.set_caption(GAME_TITLE)
+        self.clock = pygame.time.Clock()
+        self.running = True
+        self.game_over = False
+        self.paused = False
+        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Switch Player, 3=Difficulty, 4=Main Menu
+        self.game_over_menu_option = 0  # 0=Restart, 1=Switch Player
+        self.difficulty = None  # Will be set by menu
+        self.player_name = None  # Will be set by name selection
+        
+        # Show player name selection first
+        self.player_name = self.show_name_selection()
+        
+        # Show difficulty menu
+        self.difficulty = self.show_difficulty_menu()
+        
+        # Initialize game systems with selected difficulty and player name
+        self.player = Player(PLAYER_START_X, GROUND_Y)
+        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
+        self.renderer = Renderer(self.screen)
+        self.score_manager = ScoreManager(player_name=self.player_name)
+        self.input_handler = InputHandler()
+        
+        # Visual effects manager
+        self.effects = VisualEffectsManager()
+    
+    def show_name_selection(self):
+        """Show player name selection menu and return selected/entered name."""
+        from .renderer import Renderer
+        temp_renderer = Renderer(self.screen)
+        
+        # Load existing players from score manager
+        temp_score = ScoreManager()
+        existing_players = temp_score.get_all_players()
+        player_names = [name for name, _ in existing_players] if existing_players else []
+        
+        # Add "New Player" option
+        options = player_names + ["+ New Player"]
+        selected = 0
+        input_mode = False  # Are we typing a new name?
+        new_name = ""
+        
+        menu_running = True
+        while menu_running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    return "Guest"
+                
+                if event.type == pygame.KEYDOWN:
+                    if input_mode:
+                        # Typing new name
+                        if event.key == pygame.K_RETURN and len(new_name) > 0:
+                            menu_running = False
+                        elif event.key == pygame.K_ESCAPE:
+                            input_mode = False
+                            new_name = ""
+                        elif event.key == pygame.K_BACKSPACE:
+                            new_name = new_name[:-1]
+                        elif event.unicode.isalnum() or event.unicode in (' ', '-', '_'):
+                            if len(new_name) < 15:  # Max 15 characters
+                                new_name += event.unicode
+                    else:
+                        # Selecting from list
+                        if event.key == pygame.K_UP:
+                            selected = (selected - 1) % len(options)
+                        elif event.key == pygame.K_DOWN:
+                            selected = (selected + 1) % len(options)
+                        elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                            if selected == len(options) - 1:  # "New Player"
+                                input_mode = True
+                                new_name = ""
+                            else:
+                                return player_names[selected]
+            
+            # Draw menu
+            self.screen.fill(SKY_BLUE)
+            
+            if temp_renderer.font_available:
+                title_font = _load_font(60, bold=True)
+                title_text = title_font.render("SELECT PLAYER", True, BLACK)
+                title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
+                self.screen.blit(title_text, title_rect)
+                
+                if input_mode:
+                    # Show input box
+                    prompt_font = _load_font(40)
+                    prompt_text = prompt_font.render("Enter your name:", True, BLACK)
+                    prompt_rect = prompt_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
+                    self.screen.blit(prompt_text, prompt_rect)
+                    
+                    # Input box
+                    input_box = pygame.Rect(SCREEN_WIDTH // 2 - 150, 300, 300, 50)
+                    pygame.draw.rect(self.screen, WHITE, input_box)
+                    pygame.draw.rect(self.screen, BLACK, input_box, 3)
+                    
+                    # Show typed name
+                    name_font = _load_font(36)
+                    name_text = name_font.render(new_name + "|", True, BLACK)
+                    name_rect = name_text.get_rect(center=(SCREEN_WIDTH // 2, 325))
+                    self.screen.blit(name_text, name_rect)
+                    
+                    # Instructions
+                    hint_font = _load_font(24)
+                    hint_text = hint_font.render("Press ENTER to confirm, ESC to cancel", True, (100, 100, 100))
+                    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
+                    self.screen.blit(hint_text, hint_rect)
+                else:
+                    # Show player list
+                    option_font = _load_font(40)
+                    for i, option in enumerate(options):
+                        y_pos = 220 + i * 60
+                        
+                        # Show high score for existing players
+                        if i < len(player_names):
+                            score = existing_players[i][1]
+                            text = f"{option} (Best: {score})"
+                        else:
+                            text = option
+                        
+                        color = YELLOW if i == selected else BLACK
+                        option_text = option_font.render(text, True, color)
+                        option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, y_pos))
+                        self.screen.blit(option_text, option_rect)
+                        
+                        # Selection indicator
+                        if i == selected:
+                            pygame.draw.polygon(self.screen, YELLOW, [
+                                (option_rect.left - 40, y_pos),
+                                (option_rect.left - 20, y_pos - 15),
+                                (option_rect.left - 20, y_pos + 15)
+                            ])
+                    
+                    # Instructions
+                    hint_font = _load_font(24)
+                    hint_text = hint_font.render("UP/DOWN to select, ENTER to confirm", True, (100, 100, 100))
+                    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+                    self.screen.blit(hint_text, hint_rect)
+            else:
+                # Fallback text rendering
+                temp_renderer._draw_simple_text("SELECT PLAYER", SCREEN_WIDTH // 2 - 120, 100, BLACK, 24)
+                
+                if input_mode:
+                    temp_renderer._draw_simple_text("Enter your name:", SCREEN_WIDTH // 2 - 120, 250, BLACK, 18)
+                    temp_renderer._draw_simple_text(new_name + "|", SCREEN_WIDTH // 2 - 100, 320, BLACK, 20)
+                    temp_renderer._draw_simple_text("ENTER=confirm ESC=cancel", SCREEN_WIDTH // 2 - 140, 400, (100, 100, 100), 14)
+                else:
+                    for i, option in enumerate(options):
+                        y_pos = 220 + i * 50
+                        if i < len(player_names):
+                            score = existing_players[i][1]
+                            text = f"{option} ({score})"
+                        else:
+                            text = option
+                        color = YELLOW if i == selected else BLACK
+                        temp_renderer._draw_simple_text(text, SCREEN_WIDTH // 2 - 100, y_pos, color, 18)
+                    
+                    temp_renderer._draw_simple_text("UP/DOWN ENTER", SCREEN_WIDTH // 2 - 100, 500, (100, 100, 100), 14)
+            
+            pygame.display.flip()
+            self.clock.tick(FPS)
+        
+        return new_name if new_name else "Guest"
+    
+    def show_difficulty_menu(self):
+        """Show difficulty selection menu and return selected difficulty."""
+        from .renderer import Renderer
+        temp_renderer = Renderer(self.screen)
+        
+        difficulties = ["easy", "medium", "hard"]
+        selected = 1  # Default to medium
+        
+        menu_running = True
+        while menu_running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    return "hard"  # Default
+                
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP or event.key == pygame.K_w:
+                        selected = (selected - 1) % len(difficulties)
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        selected = (selected + 1) % len(difficulties)
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                        menu_running = False
+            
+            # Draw menu
+            self.screen.fill(SKY_BLUE)
+            
+            # Title
+            if temp_renderer.font_available:
+                title_font = _load_font(72, bold=True)
+                title_text = title_font.render("SELECT DIFFICULTY", True, BLACK)
+                title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
+                self.screen.blit(title_text, title_rect)
+                
+                # Options
+                option_font = _load_font(56, bold=True)
+                for i, difficulty in enumerate(difficulties):
+                    color = YELLOW if i == selected else WHITE
+                    text = option_font.render(difficulty.upper(), True, color)
+                    rect = text.get_rect(center=(SCREEN_WIDTH // 2, 300 + i * 80))
+                    self.screen.blit(text, rect)
+                    
+                    # Draw indicator
+                    if i == selected:
+                        pygame.draw.polygon(self.screen, YELLOW, [
+                            (rect.left - 40, rect.centery),
+                            (rect.left - 20, rect.centery - 15),
+                            (rect.left - 20, rect.centery + 15)
+                        ])
+                
+                # Instructions
+                inst_font = _load_font(36)
+                inst_text = inst_font.render("↑/↓ to select, ENTER to confirm", True, WHITE)
+                inst_rect = inst_text.get_rect(center=(SCREEN_WIDTH // 2, 550))
+                self.screen.blit(inst_text, inst_rect)
+                
+                # Difficulty descriptions
+                desc_font = _load_font(32)
+                descriptions = {
+                    "easy": "Wider platforms (+25%)",
+                    "medium": "Balanced challenge (+15%)",
+                    "hard": "Original difficulty"
+                }
+                desc_text = desc_font.render(descriptions[difficulties[selected]], True, (180, 180, 180))
+                desc_rect = desc_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+                self.screen.blit(desc_text, desc_rect)
+            else:
+                # Fallback rendering when fonts not available
+                temp_renderer._draw_simple_text("SELECT DIFFICULTY", SCREEN_WIDTH // 2 - 180, 150, BLACK, 32)
+                
+                # Options with simple text
+                descriptions = {
+                    "easy": "Wider platforms +25%",
+                    "medium": "Balanced challenge +15%",
+                    "hard": "Original difficulty"
+                }
+                
+                for i, difficulty in enumerate(difficulties):
+                    color = YELLOW if i == selected else WHITE
+                    y_pos = 300 + i * 80
+                    temp_renderer._draw_simple_text(difficulty.upper(), SCREEN_WIDTH // 2 - 60, y_pos, color, 24)
+                    
+                    # Draw indicator
+                    if i == selected:
+                        pygame.draw.polygon(self.screen, YELLOW, [
+                            (SCREEN_WIDTH // 2 - 100, y_pos + 10),
+                            (SCREEN_WIDTH // 2 - 80, y_pos),
+                            (SCREEN_WIDTH // 2 - 80, y_pos + 20)
+                        ])
+                
+                # Instructions
+                temp_renderer._draw_simple_text("UP/DOWN to select  ENTER to confirm", SCREEN_WIDTH // 2 - 250, 550, WHITE, 18)
+                
+                # Description for selected difficulty
+                temp_renderer._draw_simple_text(descriptions[difficulties[selected]], SCREEN_WIDTH // 2 - 150, 500, (180, 180, 180), 16)
+            
+            pygame.display.flip()
+            self.clock.tick(FPS)
+        
+        return difficulties[selected]
+        
+    def handle_events(self):
+        """Process input events."""
+        self.input_handler.process_events()
+        
+        if self.input_handler.is_quit_requested():
+            self.running = False
+        
+        # Handle pause menu
+        if self.input_handler.is_pause_pressed():
+            if not self.game_over:
+                self.paused = not self.paused  # Toggle pause
+                if not self.paused:
+                    self.pause_menu_option = 0  # Reset selection when unpausing
+        
+        if self.paused:
+            # Navigate pause menu
+            if self.input_handler.is_up_pressed():
+                self.pause_menu_option = (self.pause_menu_option - 1) % 5  # 5 options now
+            elif self.input_handler.is_down_pressed():
+                self.pause_menu_option = (self.pause_menu_option + 1) % 5  # 5 options now
+            elif self.input_handler.is_select_pressed():
+                self.handle_pause_menu_selection()
+        elif not self.game_over:
+            # Normal gameplay
+            if self.input_handler.is_jump_pressed():
+                self.player.jump()
+        else:
+            # Game over menu navigation
+            if self.input_handler.is_up_pressed():
+                self.game_over_menu_option = (self.game_over_menu_option - 1) % 2  # 2 options
+            elif self.input_handler.is_down_pressed():
+                self.game_over_menu_option = (self.game_over_menu_option + 1) % 2  # 2 options
+            elif self.input_handler.is_select_pressed() or self.input_handler.is_jump_pressed():
+                self.handle_game_over_selection()
+        
+        if self.input_handler.is_restart_pressed():
+            self.reset_game()
+    
+    def handle_game_over_selection(self):
+        """Handle game over menu selection."""
+        if self.game_over_menu_option == 0:  # Restart
+            self.reset_game()
+        elif self.game_over_menu_option == 1:  # Switch Player
+            self.player_name = self.show_name_selection()
+            self.score_manager = ScoreManager(player_name=self.player_name)
+            self.reset_game()
+    
+    def handle_pause_menu_selection(self):
+        """Handle pause menu option selection."""
+        if self.pause_menu_option == 0:  # Resume
+            self.paused = False
+        elif self.pause_menu_option == 1:  # Restart
+            self.reset_game()
+            self.paused = False
+        elif self.pause_menu_option == 2:  # Switch Player
+            self.paused = False
+            self.player_name = self.show_name_selection()
+            self.score_manager = ScoreManager(player_name=self.player_name)
+            self.reset_game()
+        elif self.pause_menu_option == 3:  # Select Difficulty
+            self.paused = False
+            self.difficulty = self.show_difficulty_menu()
+            self.reset_game()
+        elif self.pause_menu_option == 4:  # Main Menu (restart with everything)
+            self.paused = False
+            self.player_name = self.show_name_selection()
+            self.score_manager = ScoreManager(player_name=self.player_name)
+            self.difficulty = self.show_difficulty_menu()
+            self.reset_game()
+
+    
+    def reset_game(self):
+        """Reset game to initial state."""
+        from .renderer import Renderer
+        
+        self.game_over = False
+        self.player = Player(PLAYER_START_X, GROUND_Y)
+        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
+        self.renderer = Renderer(self.screen)
+        self.score_manager.reset()
+        self.effects.clear()  # Clear all visual effects
+    
+    def update(self):
+        """Update game state."""
+        if not self.game_over and not self.paused:
+            # Track previous combo for comparison
+            previous_combo = self.player.combo_streak
+            
+            self.player.update()
+            self.obstacle_generator.update()
+            self.renderer.update()  # Update background scrolling
+            
+            # Update distance and score
+            self.score_manager.update_distance(PLAYER_SPEED)
+            
+            # Check collision FIRST - this sets the just_landed flag
+            if self.obstacle_generator.check_collision(self.player):
+                self.game_over = True
+                self.score_manager.check_and_save_high_score()
+                return  # Exit early if game over
+            
+            # Award landing bonus if player just landed (with combo multiplier)
+            # This check happens AFTER collision detection so the flag is set
+            if self.player.just_landed:
+                bonus_points = self.score_manager.add_landing_bonus(self.player.combo_streak)
+                
+                # Create floating combo number popup
+                self.effects.add_score_popup(
+                    self.player.x + self.player.width // 2,
+                    self.player.y - 20,
+                    bonus_points,
+                    self.player.combo_streak
+                )
+                
+                # Show streak indicator for combos of 3+
+                if self.player.combo_streak >= 3:
+                    self.effects.add_streak_indicator(self.player.combo_streak)
+            
+            # Check if streak was broken (combo went from high to 0)
+            if previous_combo >= 3 and self.player.combo_streak == 0:
+                self.effects.add_streak_broken(
+                    self.player.x + self.player.width // 2,
+                    self.player.y - 40,
+                    previous_combo
+                )
+            
+            # Update visual effects
+            self.effects.update()
+    
+    def draw(self):
+        """Draw all game elements."""
+        score = self.score_manager.get_score()
+        high_score = self.score_manager.get_high_score()
+        
+        self.renderer.draw_background(score)
+        self.renderer.draw_ground()  # Draw ground first
+        self.obstacle_generator.draw(self.screen)  # Then obstacles (including lava) on top
+        self.player.draw(self.screen)  # Player on top of everything
+        
+        # Draw all visual effects (popups, streaks, particles)
+        self.effects.draw(self.screen)
+        
+        self.renderer.draw_ui(score, high_score, 
+                             show_instructions=(score < 5 and not self.game_over and not self.paused),
+                             current_pattern=self.obstacle_generator.current_pattern_name,
+                             player_name=self.player_name)
+        
+        if self.paused:
+            self.renderer.draw_pause_menu(self.pause_menu_option)
+        elif self.game_over:
+            self.renderer.draw_game_over(score, self.game_over_menu_option)
+        
+        pygame.display.flip()
+    
+    def run(self):
+        """Main game loop."""
+        while self.running:
+            self.handle_events()
+            self.update()
+            self.draw()
+            self.clock.tick(FPS)
+        
+        pygame.quit()
+
+
+def main():
+    """Main entry point for the game."""
+    game = Game()
+    game.run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+========================================
+FILE: ./game/obstacles.py
+========================================
+
+"""
+Obstacle classes and generation system with custom asset support and pattern loading.
+"""
+
+import pygame
+import random
+from .config import *
+from core.physics import physics
+from managers.pattern_manager import PatternManager
+
+
+class Obstacle:
+    """Single obstacle with custom sprite support and floating platform capability."""
+    
+    def __init__(self, x, height, width=30, y_offset=0, is_killzone=False, hazard_type="lava", continuous_lava=False):
+        # Import asset_manager here to avoid circular import issues
+        from .assets import asset_manager
+        
+        self.x = x
+        self.is_killzone = is_killzone  # Hazard floor marker
+        self.hazard_type = hazard_type  # "lava" or "acid"
+        self.continuous_lava = continuous_lava  # If True, extend to viewport bottom
+        
+        # Hazard floors always fill from grass to bottom for visual consistency  
+        if is_killzone:
+            self.width = width
+            # Lava fills from just above grass line to ensure collision with walking player
+            # Player bottom is at GROUND_Y + PLAYER_SIZE when walking
+            # Start lava slightly higher to ensure overlap
+            self.y = GROUND_Y + PLAYER_SIZE - 5  # Start 5px above grass line for collision
+            self.height = SCREEN_HEIGHT - self.y  # Extend to bottom of screen
+            self.y_offset = 0  # Sits on ground
+            self.custom_sprite = None
+            self.hazard_texture = asset_manager.get_hazard_texture(hazard_type)
+        else:
+            # Normal obstacles
+            self.width = width
+            self.height = height
+            self.y_offset = y_offset  # Offset from ground (0 = ground obstacle, >0 = floating)
+            self.y = GROUND_Y + PLAYER_SIZE - height - y_offset
+            self.custom_sprite = asset_manager.get_obstacle_sprite(self.width, self.height)
+            self.hazard_texture = None
+        
+        self.passed = False
+        
+        # Landing visual effects for platforms/bars
+        self.landing_squish = 0  # 0-1, amount of squish effect
+        self.landing_glow = 0  # 0-255, glow intensity
+        self.landing_blink = 0  # Counter for blink effect
+    
+    def update(self):
+        """Move obstacle left and update visual effects."""
+        self.x -= PLAYER_SPEED
+        
+        # Decay landing effects
+        if self.landing_squish > 0:
+            self.landing_squish *= 0.85
+        if self.landing_glow > 0:
+            self.landing_glow *= 0.9
+        if self.landing_blink > 0:
+            self.landing_blink -= 1
+    
+    def trigger_landing_effect(self):
+        """Trigger visual landing effects when player lands on this obstacle."""
+        self.landing_squish = 0.25  # Start at 25% squish
+        self.landing_glow = 180  # Bright glow
+        self.landing_blink = 6  # Blink for 6 frames
+    
+    def get_rect(self):
+        """Get collision rectangle."""
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+    
+    def draw(self, screen):
+        """Draw obstacle using custom sprite or procedural generation."""
+        if self.is_killzone:
+            self._draw_hazard_bar(screen)
+        elif self.custom_sprite:
+            screen.blit(self.custom_sprite, (self.x, self.y))
+        else:
+            self._draw_procedural(screen)
+    
+    def _draw_procedural(self, screen):
+        """Draw using procedural generation (gradient purple block) with landing effects."""
+        # Calculate squish dimensions
+        squish_factor = 1 - (self.landing_squish * 0.4)  # Max 10% height reduction
+        squish_height = int(self.height * squish_factor)
+        squish_y_offset = self.height - squish_height
+        
+        # Draw glow effect if active
+        if self.landing_glow > 20:
+            glow_size = 8
+            for i in range(3):
+                glow_alpha = int(self.landing_glow * (1 - i * 0.3))
+                glow_surface = pygame.Surface((self.width + glow_size*2, squish_height + glow_size*2), pygame.SRCALPHA)
+                color = (255, 255, 100, glow_alpha)  # Yellow glow
+                pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
+                screen.blit(glow_surface, (self.x - glow_size, self.y + squish_y_offset - glow_size))
+        
+        # Draw cute obstacle with gradient effect
+        for i in range(squish_height):
+            color_intensity = 216 - (i * 20 // squish_height)
+            color = (color_intensity, 191 - (i * 10 // squish_height), 216)
+            pygame.draw.rect(screen, color, (self.x, self.y + squish_y_offset + i, self.width, 1))
+        
+        # Blink effect - brighter color
+        if self.landing_blink > 0 and self.landing_blink % 2 == 0:
+            blink_surface = pygame.Surface((self.width, squish_height), pygame.SRCALPHA)
+            blink_surface.fill((255, 255, 150, 100))  # Yellow tint
+            screen.blit(blink_surface, (self.x, self.y + squish_y_offset))
+        
+        # Outline
+        pygame.draw.rect(screen, OBSTACLE_DARK, (self.x, self.y + squish_y_offset, self.width, squish_height), 2, border_radius=5)
+        
+        # Add sparkles (only if obstacle is tall enough)
+        if squish_height >= 20 and random.random() < 0.1:
+            star_x = self.x + random.randint(5, max(6, self.width - 5))
+            star_y = self.y + squish_y_offset + random.randint(5, max(6, squish_height - 5))
+            pygame.draw.circle(screen, YELLOW, (star_x, star_y), 2)
+    
+    def _draw_hazard_bar(self, screen):
+        """Draw low hazard bar (15px tall) that sits above the grass."""
+        if self.hazard_texture:
+            # Tile the hazard texture across the bar
+            texture_width = self.hazard_texture.get_width()
+            texture_height = self.hazard_texture.get_height()
+            
+            # Scale texture to fit the 15px height while maintaining aspect ratio
+            scale_factor = self.height / texture_height
+            scaled_width = int(texture_width * scale_factor)
+            scaled_height = self.height
+            scaled_texture = pygame.transform.scale(self.hazard_texture, (scaled_width, scaled_height))
+            
+            # Tile horizontally across the obstacle width
+            for x_offset in range(0, self.width, scaled_width):
+                clip_width = min(scaled_width, self.width - x_offset)
+                if clip_width > 0:
+                    clip_rect = pygame.Rect(0, 0, clip_width, scaled_height)
+                    screen.blit(scaled_texture, (self.x + x_offset, self.y), clip_rect)
+        else:
+            # Fallback: glowing red/orange bar
+            # Draw glow effect
+            for i in range(3):
+                glow_alpha = 100 - (i * 30)
+                glow_surface = pygame.Surface((self.width + i*4, self.height + i*4), pygame.SRCALPHA)
+                color = (255, 100, 0, glow_alpha)  # Orange glow
+                pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=3)
+                screen.blit(glow_surface, (self.x - i*2, self.y - i*2))
+            
+            # Main hazard bar - bright red/orange
+            pygame.draw.rect(screen, (255, 50, 0), (self.x, self.y, self.width, self.height), border_radius=2)
+            
+            # Animated warning stripes
+            stripe_offset = (pygame.time.get_ticks() // 100) % 20
+            for stripe_x in range(-20, self.width + 20, 20):
+                stripe_pos = stripe_x + stripe_offset
+                pygame.draw.line(screen, (255, 150, 0), 
+                               (self.x + stripe_pos, self.y), 
+                               (self.x + stripe_pos - 10, self.y + self.height), 3)
+
+
+class ObstacleGenerator:
+    """Generates obstacles that are always jumpable, using patterns and random generation."""
+    
+    def __init__(self, difficulty="hard"):
+        self.obstacles = []
+        self.difficulty = difficulty  # "easy", "medium", or "hard"
+        self.pattern_manager = PatternManager(difficulty=difficulty)
+        self.current_pattern_name = None  # Track current pattern for debugging
+
+        
+    def generate_obstacle(self):
+        """Generate a new obstacle using patterns or random generation."""
+        # Check if we should spawn a new obstacle
+        if len(self.obstacles) == 0:
+            should_spawn = True
+            spawn_x = SCREEN_WIDTH
+        else:
+            # Find the rightmost obstacle
+            rightmost = self.obstacles[-1]
+            right_edge = rightmost.x + rightmost.width
+            
+            # Random gap for random obstacles
+            min_spawn_distance = random.randint(MIN_OBSTACLE_GAP, MAX_OBSTACLE_GAP)
+            should_spawn = right_edge < SCREEN_WIDTH - min_spawn_distance
+            spawn_x = SCREEN_WIDTH
+        
+        if should_spawn:
+            # Use patterns 100% of the time (no random generation)
+            pattern = self.pattern_manager.get_random_pattern()
+            if pattern:
+                # Start a new pattern - spawn ALL obstacles at once
+                self.current_pattern_name = pattern.get('name', 'Unknown Pattern')
+                
+                # Calculate initial spawn position
+                if len(self.obstacles) > 0:
+                    rightmost = self.obstacles[-1]
+                    base_x = rightmost.x + rightmost.width + random.randint(MIN_OBSTACLE_GAP, MAX_OBSTACLE_GAP)
+                else:
+                    base_x = SCREEN_WIDTH
+                
+                # Spawn all pattern obstacles at once with correct relative positions
+                current_x = base_x
+                prev_gap_hazard = None  # Track hazard from previous gap for floor below platforms
+                
+                for i, pattern_obstacle in enumerate(pattern['obstacles']):
+                    height = min(pattern_obstacle['height'], physics.max_obstacle_height)
+                    width = pattern_obstacle.get('width', 30)
+                    y_offset = pattern_obstacle.get('y_offset', 0)
+                    gap_after = pattern_obstacle.get('gap_after', 0)
+                    gap_hazard = pattern_obstacle.get('gap_hazard', None)  # Hazard in gap BEFORE this obstacle
+                    
+                    # If this gap has a hazard, create a lava obstacle to fill the gap BEFORE this platform
+                    if gap_hazard and i > 0 and gap_after > 0:
+                        # The gap is the distance from the previous obstacle's right edge to current_x
+                        # We need to look back to find how big the gap actually is
+                        # For now, let's fill from the rightmost obstacle to current_x
+                        if len(self.obstacles) > 0:
+                            last_obstacle = self.obstacles[-1]
+                            gap_start = last_obstacle.x + last_obstacle.width
+                            gap_width = current_x - gap_start
+                            
+                            if gap_width > 0:  # Only create lava if there's actually a gap
+                                lava_obstacle = Obstacle(
+                                    x=gap_start,  # Start right after previous obstacle
+                                    height=15,  # Low bar
+                                    width=gap_width,
+                                    y_offset=0,  # On ground
+                                    is_killzone=True,
+                                    hazard_type=gap_hazard,
+                                    continuous_lava=False  # Regular 15px bars for now
+                                )
+                                self.obstacles.append(lava_obstacle)
+                    
+                    # Create the platform/bar
+                    obstacle = Obstacle(current_x, height, width, y_offset, False, 'lava', False)
+                    self.obstacles.append(obstacle)
+                    
+                    # If this is a floating platform (y_offset > 0), create hazard floor below it
+                    # using the hazard type from the gap to its left
+                    if y_offset > 0 and prev_gap_hazard:
+                        floor_obstacle = Obstacle(
+                            x=current_x,
+                            height=15,  # Low bar
+                            width=width,  # Same width as platform above
+                            y_offset=0,  # On ground
+                            is_killzone=True,
+                            hazard_type=prev_gap_hazard,
+                            continuous_lava=False
+                        )
+                        self.obstacles.append(floor_obstacle)
+                    
+                    # Move x position forward for next obstacle in pattern
+                    current_x += width + gap_after
+                    prev_gap_hazard = gap_hazard  # Remember for next iteration (floor below next floating platform)
+    
+    def update(self):
+        """Update all obstacles and generate new ones."""
+        self.generate_obstacle()
+        
+        # Update and remove off-screen obstacles
+        for obstacle in self.obstacles[:]:
+            obstacle.update()
+            if obstacle.x < -obstacle.width:
+                self.obstacles.remove(obstacle)
+    
+    def draw(self, screen):
+        """Draw all obstacles."""
+        for obstacle in self.obstacles:
+            obstacle.draw(screen)
+    
+    def check_collision(self, player):
+        """Check if player collides with obstacles. Hazard bars kill on any contact."""
+        player_rect = player.get_rect()
+        player_is_on_obstacle = False
+        
+        for obstacle in self.obstacles:
+            obstacle_rect = obstacle.get_rect()
+            
+            # Check if there's any overlap
+            if player_rect.colliderect(obstacle_rect):
+                # Hazard bars (killzones) kill player on ANY contact
+                if obstacle.is_killzone:
+                    return True  # Instant death - no landing allowed
+                
+                # Regular obstacles: check for landing vs collision
+                # Get player's bottom and sides
+                player_bottom = player_rect.bottom
+                player_top = player_rect.top
+                player_left = player_rect.left
+                player_right = player_rect.right
+                
+                obstacle_top = obstacle_rect.top
+                obstacle_left = obstacle_rect.left
+                obstacle_right = obstacle_rect.right
+                
+                # Calculate overlap amounts
+                overlap_bottom = player_bottom - obstacle_top
+                overlap_top = obstacle_rect.bottom - player_top
+                overlap_left = player_right - obstacle_left
+                overlap_right = obstacle_right - player_left
+                
+                # If player is descending and mostly above the obstacle, it's a landing
+                # Larger safe zone (20 pixels) for more forgiving landings, especially on wide blocks
+                if player.velocity_y >= 0 and overlap_bottom <= 20:
+                    # Landing on top - safe!
+                    player.y = obstacle_top - player.height
+                    player.velocity_y = 0
+                    player.on_ground = True
+                    player.is_jumping = False
+                    player.jumps_used = 0  # Reset double jump on landing
+                    player.has_double_jump = False
+                    player.rotation = 0  # Stop rotation when on obstacle
+                    
+                    # Trigger landing visual effects on the OBSTACLE (only if just landed on NEW obstacle)
+                    if player.current_obstacle != obstacle:  # Landing on a different obstacle
+                        obstacle.trigger_landing_effect()
+                        player.just_landed = True  # Flag for scoring bonus
+                        player.combo_streak += 1  # Increase combo for platform landing
+                        player.last_landed_on_ground = False
+                        player.current_obstacle = obstacle  # Track this obstacle
+                    
+                    player_is_on_obstacle = True
+                    # No collision, just landing
+                    continue
+                else:
+                    # Hit the side, bottom, or deep inside obstacle - that's a collision
+                    return True
+        
+        # Also check if player is standing on an obstacle (within 1 pixel above it)
+        # This helps maintain on_ground state even when not actively colliding
+        if not player_is_on_obstacle:
+            for obstacle in self.obstacles:
+                obstacle_rect = obstacle.get_rect()
+                # Check if player is directly above this obstacle
+                if (player_rect.left < obstacle_rect.right and 
+                    player_rect.right > obstacle_rect.left and
+                    abs((player.y + player.height) - obstacle_rect.top) <= 2):
+                    player_is_on_obstacle = True
+                    player.on_ground = True
+                    break
+        
+        # If player is not on ground level and not on any obstacle, they're in the air
+        if not player_is_on_obstacle and player.y < GROUND_Y - 1:
+            player.on_ground = False
+        
+        return False
+    
+    def get_score(self, player):
+        """Get score for obstacles passed."""
+        score = 0
+        player_rect = player.get_rect()
+        for obstacle in self.obstacles:
+            if not obstacle.passed and obstacle.x + obstacle.width < player_rect.x:
+                obstacle.passed = True
+                score += 1
+        return score
+    
+    def reset(self):
+        """Reset obstacle generator."""
+        self.obstacles = []
+        self.next_obstacle_x = SCREEN_WIDTH + 200
+
+
+========================================
+FILE: ./game/player.py
+========================================
+
+"""
+Player class with support for custom sprites.
+"""
+
+import pygame
+import math
+import os
+from .config import *
+
+
+def _load_font(size, bold=False):
+    """Helper to load custom font or fallback to system font."""
+    try:
+        font_path = FONT_BOLD if bold and os.path.exists(FONT_BOLD) else FONT_REGULAR
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+    except:
+        return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+
+
+class ScorePopup:
+    """Floating score text that appears when landing on platforms."""
+    
+    def __init__(self, x, y, points):
+        self.x = x
+        self.y = y
+        self.points = points
+        self.lifetime = 60  # Frames to live
+        self.age = 0
+        self.velocity_y = -2  # Float upward
+    
+    def update(self):
+        """Update popup position and age."""
+        self.age += 1
+        self.y += self.velocity_y
+        self.velocity_y += 0.05  # Slight gravity
+        return self.age < self.lifetime
+    
+    def draw(self, screen):
+        """Draw the floating score text."""
+        # Fade out over time
+        alpha = int(255 * (1 - self.age / self.lifetime))
+        
+        # Create text surface
+        text = f"+{self.points}"
+        font_size = 36 if self.points > 5 else 24
+        
+        # Try to use pygame font
+        try:
+            font = _load_font(font_size, bold=True)
+            text_surface = font.render(text, True, YELLOW)
+            text_surface.set_alpha(alpha)
+            
+            # Draw shadow
+            shadow = font.render(text, True, BLACK)
+            shadow.set_alpha(alpha // 2)
+            screen.blit(shadow, (self.x + 2, self.y + 2))
+            
+            # Draw main text
+            screen.blit(text_surface, (self.x, self.y))
+        except:
+            # Fallback to simple rendering
+            pass
+
+
+class Player:
+    """Player character with physics and rendering."""
+    
+    def __init__(self, x, y):
+        # Import asset_manager here to avoid circular import issues
+        from .assets import asset_manager
+        
+        self.x = x
+        self.y = y
+        self.width = PLAYER_SIZE
+        self.height = PLAYER_SIZE
+        self.velocity_y = 0
+        self.is_jumping = False
+        self.on_ground = False
+        self.rotation = 0
+        self.has_double_jump = False  # Can use double jump
+        self.jumps_used = 0  # Track number of jumps (0, 1, or 2)
+        
+        # Landing bonus and combo system
+        self.just_landed = False  # Flag for landing bonus
+        self.combo_streak = 0  # Number of consecutive platform landings without touching ground
+        self.last_landed_on_ground = True  # Track if last landing was on ground
+        self.current_obstacle = None  # Track which obstacle player is currently on to prevent duplicate bonuses
+        
+        # Try to load custom sprite
+        self.custom_sprite = asset_manager.get_player_sprite()
+        
+    def jump(self):
+        """Make the player jump (supports double jump)."""
+        # First jump: from ground
+        if self.on_ground and self.jumps_used == 0:
+            self.velocity_y = JUMP_POWER
+            self.is_jumping = True
+            self.on_ground = False
+            self.jumps_used = 1
+            self.has_double_jump = True
+            self.current_obstacle = None  # Clear obstacle reference when jumping off
+        # Second jump: in mid-air (double jump)
+        elif self.has_double_jump and self.jumps_used == 1 and not self.on_ground:
+            self.velocity_y = JUMP_POWER * 0.9  # Slightly weaker second jump
+            self.jumps_used = 2
+            self.has_double_jump = False
+    
+    def update(self):
+        """Update player physics and position."""
+        # Don't reset on_ground here - let collision detection handle it
+        # This prevents flickering when standing on obstacles
+        
+        # Reset just_landed flag (will be set by collision if landing)
+        self.just_landed = False
+        
+        # Apply gravity
+        self.velocity_y += GRAVITY
+        self.y += self.velocity_y
+        
+        # Check ground collision
+        if self.y >= GROUND_Y:
+            self.y = GROUND_Y
+            self.velocity_y = 0
+            self.is_jumping = False
+            self.on_ground = True
+            self.jumps_used = 0  # Reset jumps when on ground
+            self.has_double_jump = False
+            self.rotation = 0
+            
+            # Reset combo when landing on ground
+            if not self.last_landed_on_ground:
+                self.combo_streak = 0
+                self.last_landed_on_ground = True
+                self.current_obstacle = None  # Clear obstacle reference when on ground
+        elif self.velocity_y > 0:
+            # If falling and not on ground level, assume in air (will be corrected by collision)
+            # Only set to False if actually falling, not if standing on obstacle
+            if not self.on_ground:
+                self.rotation = (self.rotation + 5) % 360
+        else:
+            # Rotate while jumping/rising
+            self.rotation = (self.rotation + 5) % 360
+    
+    def get_rect(self):
+        """Get collision rectangle."""
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+    
+    def draw(self, screen):
+        """Draw the player using custom sprite or procedural generation."""
+        if self.custom_sprite:
+            self._draw_custom_sprite(screen)
+        else:
+            self._draw_procedural(screen)
+    
+    def _draw_custom_sprite(self, screen):
+        """Draw using custom loaded sprite."""
+        sprite = self.custom_sprite
+        
+        # Rotate if jumping
+        if not self.on_ground:
+            sprite = pygame.transform.rotate(sprite, self.rotation)
+            rect = sprite.get_rect(center=(self.x + self.width // 2, self.y + self.height // 2))
+            screen.blit(sprite, rect)
+        else:
+            screen.blit(sprite, (self.x, self.y))
+    
+    def _draw_procedural(self, screen):
+        """Draw using procedural generation (cute cube with face)."""
+        surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        
+        # Draw main body (pink square)
+        pygame.draw.rect(surface, PLAYER_PINK, (0, 0, self.width, self.height), border_radius=8)
+        pygame.draw.rect(surface, PLAYER_OUTLINE, (0, 0, self.width, self.height), 3, border_radius=8)
+        
+        # Draw cute face
+        # Eyes
+        eye_size = 6
+        pygame.draw.circle(surface, BLACK, (12, 15), eye_size)
+        pygame.draw.circle(surface, BLACK, (28, 15), eye_size)
+        pygame.draw.circle(surface, WHITE, (14, 13), 2)
+        pygame.draw.circle(surface, WHITE, (30, 13), 2)
+        
+        # Cute smile
+        pygame.draw.arc(surface, BLACK, (10, 15, 20, 15), 0, math.pi, 2)
+        
+        # Blush
+        pygame.draw.circle(surface, (255, 160, 180), (5, 20), 3)
+        pygame.draw.circle(surface, (255, 160, 180), (35, 20), 3)
+        
+        # Rotate if jumping
+        if not self.on_ground:
+            surface = pygame.transform.rotate(surface, self.rotation)
+            rect = surface.get_rect(center=(self.x + self.width // 2, self.y + self.height // 2))
+            screen.blit(surface, rect)
+        else:
+            screen.blit(surface, (self.x, self.y))
+
+
+========================================
+FILE: ./game/renderer.py
+========================================
+
+"""
+Rendering system for backgrounds, UI, and visual effects.
+Supports custom background images.
+"""
+
+import pygame
+import random
+import os
+from .config import *
+
+
+class Renderer:
+    """Handles all rendering operations."""
+    
+    def __init__(self, screen):
+        # Import asset_manager here to avoid circular import issues
+        from .assets import asset_manager
+        
+        self.screen = screen
+        
+        # Try to initialize fonts with custom Mochibop font
+        try:
+            # Try custom fonts from assets/fonts first
+            if os.path.exists(FONT_REGULAR):
+                self.font = pygame.font.Font(FONT_REGULAR, 36)
+                self.big_font = pygame.font.Font(FONT_BOLD if os.path.exists(FONT_BOLD) else FONT_REGULAR, 72)
+                print(f"✓ Using custom font: Mochibop")
+            else:
+                # Fallback to system fonts
+                cute_fonts = ['Comic Sans MS', 'Chalkboard', 'Marker Felt', 'Bradley Hand', 'Arial Rounded MT Bold']
+                self.font = None
+                self.big_font = None
+                
+                for font_name in cute_fonts:
+                    try:
+                        self.font = pygame.font.SysFont(font_name, 36)
+                        self.big_font = pygame.font.SysFont(font_name, 72)
+                        if self.font and self.big_font:
+                            print(f"✓ Using system font: {font_name}")
+                            break
+                    except:
+                        continue
+                
+                # If no cute fonts found, use default
+                if not self.font:
+                    self.font = pygame.font.SysFont(None, 36)
+                    self.big_font = pygame.font.SysFont(None, 72)
+                    print("✓ Using default system font")
+            
+            self.font_available = True
+        except (NotImplementedError, ImportError) as e:
+            # Font module not available
+            self.font_available = False
+            print(f"Warning: pygame.font not available ({e}), using basic text rendering")
+        
+        # Try to load custom background
+        self.backgrounds = asset_manager.get_background_images()
+        self.custom_ground = asset_manager.get_ground_sprite()
+        
+        # Background cycling with random repetition
+        self.current_bg_index = 0
+        self.bg_repeat_count = 0
+        self.bg_repeats_remaining = 0
+        if self.backgrounds:
+            self.bg_repeat_count = random.randint(1, 4)
+            self.bg_repeats_remaining = self.bg_repeat_count
+        
+        # Parallax scrolling for backgrounds
+        self.bg_scroll_offset = 0
+        self.bg_scroll_speed = PLAYER_SPEED * BACKGROUND_SCROLL_SPEED_MULTIPLIER
+        
+        # Cloud animation offset
+        self.cloud_offset = 0
+    
+    def _choose_next_background(self):
+        """Choose the next background with random repetition."""
+        if not self.backgrounds:
+            return
+        
+        # If we still have repeats left, don't change background
+        if self.bg_repeats_remaining > 0:
+            self.bg_repeats_remaining -= 1
+            return
+        
+        # Move to next background
+        self.current_bg_index = (self.current_bg_index + 1) % len(self.backgrounds)
+        
+        # Decide how many times to repeat this background (1-4 times)
+        self.bg_repeat_count = random.randint(1, 4)
+        self.bg_repeats_remaining = self.bg_repeat_count - 1
+    
+    def update(self):
+        """Update scrolling animations."""
+        # Update background scroll offset for parallax effect
+        self.bg_scroll_offset += self.bg_scroll_speed
+        # Wrap around when we've scrolled a full screen width
+        if self.bg_scroll_offset >= SCREEN_WIDTH:
+            self.bg_scroll_offset -= SCREEN_WIDTH
+    
+    def draw_background(self, score=0):
+        """Draw background (custom or procedural) with parallax scrolling."""
+        if self.backgrounds:
+            # Change background every 5 points
+            if score > 0 and score % 5 == 0:
+                bg_change_threshold = (score // 5) - 1
+                if bg_change_threshold != getattr(self, '_last_bg_change', -1):
+                    self._last_bg_change = bg_change_threshold
+                    self._choose_next_background()
+            
+            # Calculate scroll position (negative to scroll left)
+            scroll_x = -int(self.bg_scroll_offset)
+            
+            # Draw current background with seamless looping
+            current_bg = self.backgrounds[self.current_bg_index]
+            self.screen.blit(current_bg, (scroll_x, 0))
+            self.screen.blit(current_bg, (scroll_x + SCREEN_WIDTH, 0))
+        else:
+            self._draw_procedural_background()
+    
+    def _draw_procedural_background(self):
+        """Draw procedural gradient sky with clouds."""
+        # Gradient sky
+        for i in range(SCREEN_HEIGHT):
+            color_intensity = 173 + (i * 50 // SCREEN_HEIGHT)
+            color = (173, 216 - (i * 20 // SCREEN_HEIGHT), 230)
+            pygame.draw.line(self.screen, color, (0, i), (SCREEN_WIDTH, i))
+        
+        # Animated clouds
+        self.cloud_offset = (pygame.time.get_ticks() // 50) % SCREEN_WIDTH
+        cloud_y_positions = [50, 100, 150, 80, 130]
+        for i, y in enumerate(cloud_y_positions):
+            x = (self.cloud_offset + i * 200) % (SCREEN_WIDTH + 100) - 50
+            self._draw_cloud(x, y)
+    
+    def _draw_cloud(self, x, y):
+        """Draw a cute cloud."""
+        pygame.draw.circle(self.screen, WHITE, (x, y), 20)
+        pygame.draw.circle(self.screen, WHITE, (x + 25, y), 25)
+        pygame.draw.circle(self.screen, WHITE, (x + 50, y), 20)
+        pygame.draw.circle(self.screen, WHITE, (x + 25, y - 15), 20)
+    
+    def draw_ground(self):
+        """Draw ground (custom or procedural)."""
+        if self.custom_ground:
+            # Tile the ground sprite
+            sprite_width = self.custom_ground.get_width()
+            sprite_height = self.custom_ground.get_height()
+            y_pos = GROUND_Y + PLAYER_SIZE
+            
+            for x in range(0, SCREEN_WIDTH, sprite_width):
+                self.screen.blit(self.custom_ground, (x, y_pos))
+        else:
+            self._draw_procedural_ground()
+    
+    def _draw_procedural_ground(self):
+        """Draw procedural ground with grass."""
+        # Main ground
+        pygame.draw.rect(self.screen, GROUND_GREEN, 
+                        (0, GROUND_Y + PLAYER_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT))
+        
+        # Grass detail
+        for x in range(0, SCREEN_WIDTH, 20):
+            grass_height = random.randint(5, 10)
+            pygame.draw.line(self.screen, GROUND_DARK, 
+                           (x, GROUND_Y + PLAYER_SIZE), 
+                           (x, GROUND_Y + PLAYER_SIZE - grass_height), 2)
+    
+    def draw_ui(self, score, high_score, show_instructions=False, current_pattern=None, player_name=None):
+        """Draw score and UI elements."""
+        if not self.font_available:
+            # Draw simple text blocks when font is not available
+            if player_name:
+                self._draw_simple_text(f"Player: {player_name}", 20, 10)
+                self._draw_simple_text(f"Score: {score}", 20, 35)
+                self._draw_simple_text(f"Best: {high_score}", 20, 60)
+            else:
+                self._draw_simple_text(f"Score: {score}", 20, 10)
+                self._draw_simple_text(f"Best: {high_score}", 20, 50)
+            if show_instructions:
+                self._draw_simple_text("Press SPACE to jump!", SCREEN_WIDTH // 2 - 150, 10)
+            # Pattern debug info
+            if SHOW_PATTERN_DEBUG and current_pattern:
+                self._draw_simple_text(f"Pattern: {current_pattern}", 20, 90, color=BLACK)
+        else:
+            # Player name (if provided) - compact layout on one line with score
+            y_offset = 15
+            if player_name:
+                player_text = self.font.render(f"🎮 {player_name}", True, HEART_RED)
+                self.screen.blit(player_text, (20, y_offset))
+                
+                # Score on same line, to the right of player name
+                score_text = self.font.render(f"Score: {score}", True, BLACK)
+                score_x = 20 + player_text.get_width() + 30  # 30px spacing
+                self.screen.blit(score_text, (score_x, y_offset))
+                
+                # High score on same line, to the right of score
+                high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
+                high_score_x = score_x + score_text.get_width() + 30
+                self.screen.blit(high_score_text, (high_score_x, y_offset))
+            else:
+                # No player name - just score and high score
+                score_text = self.font.render(f"Score: {score}", True, BLACK)
+                self.screen.blit(score_text, (20, y_offset))
+                
+                high_score_text = self.font.render(f"Best: {high_score}", True, BLACK)
+                high_score_x = 20 + score_text.get_width() + 30
+                self.screen.blit(high_score_text, (high_score_x, y_offset))
+            
+            # Instructions
+            if show_instructions:
+                instruction_text = self.font.render("Press SPACE to jump!", True, BLACK)
+                self.screen.blit(instruction_text, (SCREEN_WIDTH // 2 - 150, 15))
+            
+            # Pattern debug info (below main UI)
+            if SHOW_PATTERN_DEBUG and current_pattern:
+                pattern_text = self.font.render(f"Pattern: {current_pattern}", True, BLACK)
+                self.screen.blit(pattern_text, (20, 55))
+    
+    def _draw_simple_text(self, text, x, y, color=BLACK, size=16):
+        """Draw simple pixel text when pygame.font is not available."""
+        # Simple 5x7 pixel font patterns for readable text
+        # Each character is a 5-bit pattern per row (7 rows)
+        font_data = {
+            'A': [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
+            'B': [0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110],
+            'C': [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],
+            'D': [0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110],
+            'E': [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111],
+            'F': [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000],
+            'G': [0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110],
+            'H': [0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
+            'I': [0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
+            'J': [0b00111, 0b00010, 0b00010, 0b00010, 0b00010, 0b10010, 0b01100],
+            'L': [0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111],
+            'M': [0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001],
+            'N': [0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001],
+            'O': [0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
+            'P': [0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000],
+            'R': [0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001],
+            'S': [0b01110, 0b10001, 0b10000, 0b01110, 0b00001, 0b10001, 0b01110],
+            'T': [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100],
+            'U': [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
+            'V': [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100],
+            'W': [0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b11011, 0b10001],
+            'Y': [0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100],
+            '0': [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
+            '1': [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
+            '2': [0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111],
+            '3': [0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110],
+            '4': [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
+            '5': [0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110],
+            '6': [0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110],
+            '7': [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
+            '8': [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
+            '9': [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100],
+            ':': [0b00000, 0b00100, 0b00000, 0b00000, 0b00000, 0b00100, 0b00000],
+            '!': [0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100],
+            ' ': [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000],
+        }
+        
+        # Calculate character size based on size parameter
+        pixel_size = max(1, size // 8)
+        char_width = 6 * pixel_size
+        char_height = 7 * pixel_size
+        
+        # Draw each character
+        for i, char in enumerate(text.upper()):
+            if char in font_data:
+                pattern = font_data[char]
+                char_x = x + i * char_width
+                
+                # Draw the character pixel by pixel
+                for row in range(7):
+                    for col in range(5):
+                        if pattern[row] & (1 << (4 - col)):
+                            pygame.draw.rect(self.screen, color, 
+                                           (char_x + col * pixel_size, 
+                                            y + row * pixel_size, 
+                                            pixel_size, pixel_size))
+    
+    def draw_game_over(self, score, selected_option=0):
+        """Draw game over screen with menu options."""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(128)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        menu_options = ["Restart", "Switch Player"]
+        
+        if not self.font_available:
+            # Simple fallback rendering
+            self._draw_simple_text("Game Over!", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 100, HEART_RED, 24)
+            self._draw_simple_text(f"Final Score: {score}", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 40, WHITE, 18)
+            
+            for i, option in enumerate(menu_options):
+                y = SCREEN_HEIGHT // 2 + 20 + i * 50
+                color = YELLOW if i == selected_option else WHITE
+                prefix = "> " if i == selected_option else "  "
+                self._draw_simple_text(f"{prefix}{option}", SCREEN_WIDTH // 2 - 80, y, color, 18)
+            
+            self._draw_simple_text("Use Arrow Keys + SPACE", SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 + 150, SKY_LIGHT, 14)
+        else:
+            # Game Over text
+            game_over_text = self.big_font.render("Game Over! 💫", True, HEART_RED)
+            text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100))
+            self.screen.blit(game_over_text, text_rect)
+            
+            # Final score
+            score_text = self.font.render(f"Final Score: {score}", True, WHITE)
+            score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
+            self.screen.blit(score_text, score_rect)
+            
+            # Menu options
+            for i, option in enumerate(menu_options):
+                y = SCREEN_HEIGHT // 2 + 20 + i * 60
+                
+                # Highlight selected option
+                if i == selected_option:
+                    color = YELLOW
+                    # Draw selection background
+                    bg_rect = pygame.Rect(SCREEN_WIDTH // 2 - 120, y - 10, 240, 50)
+                    pygame.draw.rect(self.screen, (255, 255, 100, 100), bg_rect, border_radius=10)
+                    pygame.draw.rect(self.screen, YELLOW, bg_rect, 3, border_radius=10)
+                    option_text = self.font.render(f"▸ {option}", True, color)
+                else:
+                    color = WHITE
+                    option_text = self.font.render(option, True, color)
+                
+                option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, y + 10))
+                self.screen.blit(option_text, option_rect)
+            
+            # Instructions
+            hint_text = self.font.render("↑/↓ to select, SPACE to confirm", True, SKY_LIGHT)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 170))
+            self.screen.blit(hint_text, hint_rect)
+    
+    def draw_pause_menu(self, selected_option):
+        """Draw pause menu with options: Resume, Restart, Switch Player, Select Difficulty, Main Menu."""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        menu_options = ["Resume", "Restart", "Switch Player", "Select Difficulty", "Main Menu"]
+        
+        if not self.font_available:
+            # Simple fallback rendering
+            self._draw_simple_text("PAUSED", SCREEN_WIDTH // 2 - 60, 150, YELLOW, 24)
+            
+            for i, option in enumerate(menu_options):
+                y = 250 + i * 60
+                color = HEART_RED if i == selected_option else WHITE
+                prefix = "> " if i == selected_option else "  "
+                self._draw_simple_text(f"{prefix}{option}", SCREEN_WIDTH // 2 - 120, y, color, 18)
+            
+            self._draw_simple_text("Use Arrow Keys + SPACE", SCREEN_WIDTH // 2 - 140, 500, SKY_LIGHT, 14)
+        else:
+            # Pause title
+            pause_text = self.big_font.render("⏸ PAUSED", True, YELLOW)
+            pause_rect = pause_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
+            self.screen.blit(pause_text, pause_rect)
+            
+            # Menu options
+            for i, option in enumerate(menu_options):
+                y = 250 + i * 60
+                
+                # Highlight selected option
+                if i == selected_option:
+                    color = HEART_RED
+                    # Draw selection background
+                    bg_rect = pygame.Rect(SCREEN_WIDTH // 2 - 150, y - 10, 300, 50)
+                    pygame.draw.rect(self.screen, (255, 200, 200, 100), bg_rect, border_radius=10)
+                    pygame.draw.rect(self.screen, HEART_RED, bg_rect, 3, border_radius=10)
+                    option_text = self.font.render(f"▸ {option}", True, color)
+                else:
+                    color = WHITE
+                    option_text = self.font.render(option, True, color)
+                
+                option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, y + 10))
+                self.screen.blit(option_text, option_rect)
+            
+            # Controls hint
+            hint_text = self.font.render("Use ↑↓ Arrow Keys + SPACE or ESC to Resume", True, SKY_LIGHT)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+            self.screen.blit(hint_text, hint_rect)
+
+
+========================================
+FILE: ./game/visual_effects.py
+========================================
+
+"""
+Visual effects system for game feedback - popups, streaks, combos.
+"""
+
+import pygame
+import math
+import random
+import os
+from .config import *
+
+
+def _load_font(size, bold=False):
+    """Helper to load custom font or fallback to system font."""
+    try:
+        font_path = FONT_BOLD if bold and os.path.exists(FONT_BOLD) else FONT_REGULAR
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            # Fallback to system font
+            return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+    except:
+        return pygame.font.SysFont('Comic Sans MS', size, bold=bold)
+
+
+class ScorePopup:
+    """Floating score text that appears when landing on platforms."""
+    
+    def __init__(self, x, y, points, combo_streak=0):
+        self.x = x
+        self.y = y
+        self.points = points
+        self.combo_streak = combo_streak
+        self.lifetime = 60  # Frames to live
+        self.age = 0
+        self.velocity_y = -2  # Float upward
+        self.velocity_x = 0
+    
+    def update(self):
+        """Update popup position and age."""
+        self.age += 1
+        self.y += self.velocity_y
+        self.x += self.velocity_x
+        self.velocity_y += 0.05  # Slight gravity
+        return self.age < self.lifetime
+    
+    def draw(self, screen):
+        """Draw the floating score text."""
+        # Fade out over time
+        alpha = int(255 * (1 - self.age / self.lifetime))
+        
+        # Create text based on combo streak
+        if self.combo_streak > 0:
+            text = f"+{self.combo_streak}"
+            color = self._get_combo_color(self.combo_streak)
+        else:
+            text = f"+{self.points}"
+            color = YELLOW
+        
+        font_size = 36 if self.points > 5 else 24
+        
+        # Try to use pygame font
+        try:
+            font = _load_font(font_size, bold=True)
+            text_surface = font.render(text, True, color)
+            text_surface.set_alpha(alpha)
+            
+            # Draw shadow
+            shadow = font.render(text, True, BLACK)
+            shadow.set_alpha(alpha // 2)
+            screen.blit(shadow, (self.x + 2, self.y + 2))
+            
+            # Draw main text
+            screen.blit(text_surface, (self.x, self.y))
+        except:
+            # Fallback to simple rendering
+            pass
+    
+    def _get_combo_color(self, streak):
+        """Get color based on combo streak."""
+        if streak >= 10:
+            return (255, 0, 255)  # Magenta for 10+
+        elif streak >= 5:
+            return (255, 100, 0)  # Orange for 5+
+        elif streak >= 3:
+            return (255, 200, 0)  # Gold for 3+
+        else:
+            return YELLOW  # Yellow for 1-2
+
+
+class StreakIndicator:
+    """Flashy streak counter that shows current combo."""
+    
+    def __init__(self, x, y, streak_count):
+        self.x = x
+        self.y = y
+        self.streak_count = streak_count
+        self.lifetime = 90  # Longer lifetime for streak messages
+        self.age = 0
+        self.scale = 1.0
+        self.pulse_speed = 0.1
+    
+    def update(self):
+        """Update streak indicator animation."""
+        self.age += 1
+        # Pulse effect
+        self.scale = 1.0 + 0.2 * math.sin(self.age * self.pulse_speed)
+        return self.age < self.lifetime
+    
+    def draw(self, screen):
+        """Draw flashy streak indicator."""
+        # Fade out near end
+        if self.age > self.lifetime - 20:
+            alpha = int(255 * ((self.lifetime - self.age) / 20))
+        else:
+            alpha = 255
+        
+        try:
+            # Main streak text
+            base_size = 48
+            font_size = int(base_size * self.scale)
+            font = _load_font(font_size, bold=True)
+            
+            # Different messages based on streak level
+            if self.streak_count >= 10:
+                text = f"🔥 UNSTOPPABLE x{self.streak_count}! 🔥"
+                color = (255, 0, 255)  # Magenta
+                glow_color = (255, 100, 255)
+            elif self.streak_count >= 5:
+                text = f"⚡ ON FIRE x{self.streak_count}! ⚡"
+                color = (255, 100, 0)  # Orange
+                glow_color = (255, 150, 50)
+            elif self.streak_count >= 3:
+                text = f"✨ STREAK x{self.streak_count}! ✨"
+                color = (255, 200, 0)  # Gold
+                glow_color = (255, 230, 100)
+            else:
+                text = f"COMBO x{self.streak_count}!"
+                color = YELLOW
+                glow_color = (255, 255, 150)
+            
+            # Draw glow effect
+            for offset in range(3, 0, -1):
+                glow_alpha = alpha // (offset + 1)
+                glow_font = _load_font(font_size + offset * 2, bold=True)
+                glow_surface = glow_font.render(text, True, glow_color)
+                glow_surface.set_alpha(glow_alpha)
+                glow_rect = glow_surface.get_rect(center=(self.x, self.y))
+                screen.blit(glow_surface, glow_rect)
+            
+            # Draw main text
+            text_surface = font.render(text, True, color)
+            text_surface.set_alpha(alpha)
+            text_rect = text_surface.get_rect(center=(self.x, self.y))
+            screen.blit(text_surface, text_rect)
+            
+            # Draw outline
+            outline_font = _load_font(font_size, bold=True)
+            outline_surface = outline_font.render(text, True, BLACK)
+            outline_surface.set_alpha(alpha)
+            for dx, dy in [(-2, 0), (2, 0), (0, -2), (0, 2)]:
+                outline_rect = outline_surface.get_rect(center=(self.x + dx, self.y + dy))
+                screen.blit(outline_surface, outline_rect)
+            
+        except:
+            # Fallback rendering
+            pass
+
+
+class StreakBrokenIndicator:
+    """Visual indicator when a streak is broken."""
+    
+    def __init__(self, x, y, broken_streak):
+        self.x = x
+        self.y = y
+        self.broken_streak = broken_streak
+        self.lifetime = 60
+        self.age = 0
+        self.velocity_y = 1  # Fall down slightly
+    
+    def update(self):
+        """Update broken streak animation."""
+        self.age += 1
+        self.y += self.velocity_y
+        self.velocity_y += 0.05
+        return self.age < self.lifetime
+    
+    def draw(self, screen):
+        """Draw streak broken message."""
+        alpha = int(255 * (1 - self.age / self.lifetime))
+        
+        try:
+            font_size = 36
+            font = _load_font(font_size, bold=True)
+            
+            # Show the streak that was lost
+            if self.broken_streak >= 5:
+                text = f"💔 STREAK LOST x{self.broken_streak}!"
+                color = (255, 50, 50)  # Red
+            elif self.broken_streak >= 3:
+                text = f"Streak Lost x{self.broken_streak}"
+                color = (200, 100, 100)  # Light red
+            else:
+                # Don't show for small streaks
+                return
+            
+            # Draw shadow
+            shadow = font.render(text, True, BLACK)
+            shadow.set_alpha(alpha // 2)
+            shadow_rect = shadow.get_rect(center=(self.x + 2, self.y + 2))
+            screen.blit(shadow, shadow_rect)
+            
+            # Draw main text
+            text_surface = font.render(text, True, color)
+            text_surface.set_alpha(alpha)
+            text_rect = text_surface.get_rect(center=(self.x, self.y))
+            screen.blit(text_surface, text_rect)
+            
+        except:
+            # Fallback rendering
+            pass
+
+
+class ComboParticle:
+    """Small particle effects that spawn during combos."""
+    
+    def __init__(self, x, y, color):
+        self.x = x
+        self.y = y
+        self.color = color
+        self.lifetime = 30
+        self.age = 0
+        # Random velocity
+        angle = math.radians(random.randint(0, 360))
+        speed = random.uniform(1, 3)
+        self.velocity_x = math.cos(angle) * speed
+        self.velocity_y = math.sin(angle) * speed - 2  # Bias upward
+        self.size = random.randint(3, 6)
+    
+    def update(self):
+        """Update particle position."""
+        self.age += 1
+        self.x += self.velocity_x
+        self.y += self.velocity_y
+        self.velocity_y += 0.2  # Gravity
+        return self.age < self.lifetime
+    
+    def draw(self, screen):
+        """Draw particle."""
+        alpha = int(255 * (1 - self.age / self.lifetime))
+        size = int(self.size * (1 - self.age / self.lifetime))
+        
+        if size > 0:
+            surface = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+            color_with_alpha = (*self.color, alpha)
+            pygame.draw.circle(surface, color_with_alpha, (size, size), size)
+            screen.blit(surface, (self.x - size, self.y - size))
+
+
+class VisualEffectsManager:
+    """Manages all visual effects in the game."""
+    
+    def __init__(self):
+        self.score_popups = []
+        self.streak_indicators = []
+        self.streak_broken_indicators = []
+        self.particles = []
+    
+    def add_score_popup(self, x, y, points, combo_streak=0):
+        """Add a floating score popup."""
+        popup = ScorePopup(x, y, points, combo_streak)
+        self.score_popups.append(popup)
+    
+    def add_streak_indicator(self, streak_count):
+        """Add a flashy streak indicator."""
+        x = SCREEN_WIDTH // 2
+        y = 150
+        indicator = StreakIndicator(x, y, streak_count)
+        self.streak_indicators.append(indicator)
+        
+        # Add particles for big streaks
+        if streak_count >= 3:
+            self._add_combo_particles(x, y, streak_count)
+    
+    def add_streak_broken(self, x, y, broken_streak):
+        """Add streak broken indicator."""
+        if broken_streak >= 3:  # Only show for streaks of 3+
+            indicator = StreakBrokenIndicator(x, y, broken_streak)
+            self.streak_broken_indicators.append(indicator)
+    
+    def _add_combo_particles(self, x, y, streak_count):
+        """Add particles for combo effects."""
+        # Determine color based on streak
+        if streak_count >= 10:
+            color = (255, 0, 255)
+        elif streak_count >= 5:
+            color = (255, 100, 0)
+        else:
+            color = (255, 200, 0)
+        
+        # Spawn particles
+        particle_count = min(streak_count * 2, 20)
+        for _ in range(particle_count):
+            particle = ComboParticle(x, y, color)
+            self.particles.append(particle)
+    
+    def update(self):
+        """Update all visual effects."""
+        self.score_popups = [p for p in self.score_popups if p.update()]
+        self.streak_indicators = [s for s in self.streak_indicators if s.update()]
+        self.streak_broken_indicators = [s for s in self.streak_broken_indicators if s.update()]
+        self.particles = [p for p in self.particles if p.update()]
+    
+    def draw(self, screen):
+        """Draw all visual effects."""
+        # Draw particles first (background layer)
+        for particle in self.particles:
+            particle.draw(screen)
+        
+        # Draw score popups
+        for popup in self.score_popups:
+            popup.draw(screen)
+        
+        # Draw streak indicators (foreground layer)
+        for indicator in self.streak_indicators:
+            indicator.draw(screen)
+        
+        # Draw streak broken indicators
+        for indicator in self.streak_broken_indicators:
+            indicator.draw(screen)
+    
+    def clear(self):
+        """Clear all effects."""
+        self.score_popups.clear()
+        self.streak_indicators.clear()
+        self.streak_broken_indicators.clear()
+        self.particles.clear()
+
+
+========================================
+FILE: ./generators/__init__.py
+========================================
+
+"""
+Pattern Generator Package - Modular obstacle pattern generation system.
+
+This package provides tools for generating physics-validated obstacle patterns
+for the Geometry Dash clone game.
+"""
+
+from .physics_engine import (
+    GRAVITY,
+    JUMP_POWER,
+    PLAYER_SPEED,
+    GROUND_Y,
+    MAX_JUMP_DISTANCE,
+    MAX_OBSTACLE_HEIGHT,
+    MIN_PLATFORM_HEIGHT,
+    MAX_PLATFORM_HEIGHT,
+    calculate_jump_trajectory,
+    platform_intersects_trajectory,
+    can_reach_platform,
+    validate_pattern
+)
+
+from .obstacle_builders import (
+    create_pattern,
+    create_platform,
+    create_floating_platform,
+    random_gap,
+    random_heights,
+    alternating_heights,
+    wave_heights,
+    stepped_heights,
+    constant_height,
+    varied_widths,
+    rhythm_widths,
+    GAP_RHYTHM_SHORT,
+    GAP_RHYTHM_MEDIUM,
+    GAP_RHYTHM_LONG,
+    GAP_RHYTHM_VARIED
+)
+
+from .pattern_library import (
+    steady_rhythm_v4,
+    wave_rider_v4,
+    quick_hops_v4,
+    rest_and_run_v4,
+    stepped_ascent_v4,
+    zigzag_chaos_v4,
+    long_jumper_v4,
+    mixed_madness_v4,
+    kitchen_sink_v4,
+    obstacle_course_v4,
+    scale_pattern_widths,
+    generate_difficulty_variants
+)
+
+__all__ = [
+    # Physics
+    'GRAVITY', 'JUMP_POWER', 'PLAYER_SPEED', 'GROUND_Y',
+    'MAX_JUMP_DISTANCE', 'MAX_OBSTACLE_HEIGHT',
+    'MIN_PLATFORM_HEIGHT', 'MAX_PLATFORM_HEIGHT',
+    'calculate_jump_trajectory', 'platform_intersects_trajectory',
+    'can_reach_platform', 'validate_pattern',
+    
+    # Builders
+    'create_pattern', 'create_platform', 'create_floating_platform',
+    'random_gap', 'random_heights', 'alternating_heights',
+    'wave_heights', 'stepped_heights', 'constant_height',
+    'varied_widths', 'rhythm_widths',
+    'GAP_RHYTHM_SHORT', 'GAP_RHYTHM_MEDIUM', 'GAP_RHYTHM_LONG', 'GAP_RHYTHM_VARIED',
+    
+    # Pattern Library
+    'steady_rhythm_v4', 'wave_rider_v4', 'quick_hops_v4',
+    'rest_and_run_v4', 'stepped_ascent_v4', 'zigzag_chaos_v4',
+    'long_jumper_v4', 'mixed_madness_v4', 'kitchen_sink_v4',
+    'obstacle_course_v4', 'scale_pattern_widths', 'generate_difficulty_variants'
+]
+
+
+========================================
+FILE: ./generators/main.py
+========================================
+
+#!/usr/bin/env python3
+"""
+Pattern Generator Main Entry Point
+
+Generates all obstacle patterns with difficulty variants and saves them
+to the obstacle_patterns directory.
+
+Usage:
+    python -m generators.main
+    or
+    python generators/main.py
+"""
+
+import os
+import json
+
+from .physics_engine import validate_pattern
+from .obstacle_builders import create_pattern
+from .pattern_library import (
+    steady_rhythm_v4,
+    wave_rider_v4,
+    quick_hops_v4,
+    rest_and_run_v4,
+    stepped_ascent_v4,
+    zigzag_chaos_v4,
+    long_jumper_v4,
+    mixed_madness_v4,
+    kitchen_sink_v4,
+    obstacle_course_v4,
+    generate_difficulty_variants
+)
+
+
+OUTPUT_DIR = "obstacle_patterns"
+
+
+def ensure_dir(path):
+    """Create directory if it doesn't exist."""
+    os.makedirs(path, exist_ok=True)
+
+
+def save_pattern(pattern, filename):
+    """
+    Validate and save pattern to JSON file.
+    
+    Args:
+        pattern: Pattern dictionary
+        filename: Output filename (without .json extension)
+        
+    Returns:
+        True if successful, False if validation failed
+    """
+    ensure_dir(OUTPUT_DIR)
+    
+    # Validate pattern before saving
+    is_valid, error_msg, touches_ground = validate_pattern(pattern)
+    if not is_valid:
+        print(f"✗ FAILED: {filename} - {error_msg}")
+        return False
+    
+    # Update lava zones based on ground touching
+    obstacles = pattern['obstacles']
+    for obs in obstacles:
+        if obs.get('is_killzone', False):
+            # If jump paths never touch ground, make lava continuous (full height)
+            if not touches_ground:
+                obs['continuous_lava'] = True  # Flag for rendering full-height lava
+    
+    path = os.path.join(OUTPUT_DIR, f"{filename}.json")
+    with open(path, "w") as f:
+        json.dump(pattern, f, indent=2)
+    lava_type = "continuous" if not touches_ground else "15px bars"
+    print(f"✓ Created: {filename} ({pattern['metadata']['length']} platforms, {pattern['metadata']['type']}, lava: {lava_type}) - VALIDATED")
+    return True
+
+
+def generate_all_patterns():
+    """Generate all patterns with difficulty variants."""
+    print("\n" + "="*70)
+    print("=== GEOMETRY DASH PATTERN GENERATOR V4 ===")
+    print("=== THE FLOOR IS LAVA - RHYTHM PLATFORMER ===")
+    print("="*70)
+    print("\nGameplay: Jump-in, land, jump-out rhythm")
+    print("Heights: 2-4 (60-120px above lava)")
+    print("Difficulties: Easy (+25% width), Medium (+15% width), Hard (original)")
+    print("Validation: Built-in physics ensures all patterns are playable\n")
+    
+    ensure_dir(OUTPUT_DIR)
+    
+    generators = [
+        steady_rhythm_v4,
+        wave_rider_v4,
+        quick_hops_v4,
+        rest_and_run_v4,
+        stepped_ascent_v4,
+        zigzag_chaos_v4,
+        long_jumper_v4,
+        mixed_madness_v4,
+        kitchen_sink_v4,
+        obstacle_course_v4,
+    ]
+    
+    success_count = 0
+    fail_count = 0
+    
+    for gen in generators:
+        # Generate difficulty variants
+        variants = generate_difficulty_variants(gen)
+        
+        for pattern, difficulty_suffix in variants:
+            # Get base name without difficulty tag (remove "(Hard)", "(Medium)", "(Easy)")
+            base_name = pattern["name"].replace(" (Hard)", "").replace(" (Medium)", "").replace(" (Easy)", "")
+            fname = base_name.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_") + difficulty_suffix
+            if save_pattern(pattern, fname):
+                success_count += 1
+            else:
+                fail_count += 1
+    
+    print(f"\n{'='*70}")
+    print(f"✅ Successfully generated {success_count} valid patterns")
+    if fail_count > 0:
+        print(f"❌ Failed to generate {fail_count} patterns (physics validation failed)")
+    print(f"{'='*70}")
+    print("\nPattern Features:")
+    print("  • Floor is lava - never touch ground!")
+    print("  • All platforms floating (60-120px elevation)")
+    print("  • Rhythm-based gameplay - jump, land, repeat")
+    print("  • Varied platform sizes (thin hops to wide rest areas)")
+    print("  • Physics-validated - all patterns guaranteed playable")
+    print(f"\n{'='*70}\n")
+
+
+if __name__ == "__main__":
+    generate_all_patterns()
+
+
+========================================
+FILE: ./generators/obstacle_builders.py
+========================================
+
+"""
+Obstacle Builders - Pattern creation utilities
+
+Provides builder functions for creating obstacles, platforms, and patterns
+with varied gaps, heights, and widths.
+"""
+
+import random
+
+
+# ============================================================================
+# GAP PATTERNS
+# ============================================================================
+
+# Jump peaks at 112.5px horizontal distance
+# For elevated platforms, you need to be descending when you arrive
+# Higher platforms = need even more distance because jump goes higher
+# Safe formula: gap should be > (112px + height_boost)
+# For heights 60-120px, minimum gap should be ~180-200px to ensure landing
+GAP_RHYTHM_SHORT = ["gap-1.75", "gap-2.0", "gap-1.75", "gap-2.0"]  # 175-200px - safe minimum
+GAP_RHYTHM_MEDIUM = ["gap-2.0", "gap-2.25", "gap-2.0", "gap-2.25"]  # 200-225px - comfortable
+GAP_RHYTHM_LONG = ["gap-2.0", "gap-2.25", "gap-2.0", "gap-2.25"]  # 200-225px - max distance
+GAP_RHYTHM_VARIED = ["gap-1.75", "gap-2.0", "gap-2.25", "gap-2.0"]  # Mixed rhythm
+
+
+def random_gap(min_mult=1.75, max_mult=2.25):
+    """
+    Generate random gap for elevated platforms (needs >175px for safe landing).
+    
+    Args:
+        min_mult: Minimum gap multiplier
+        max_mult: Maximum gap multiplier
+        
+    Returns:
+        Gap string in format "gap-{multiplier}"
+    """
+    mult = round(random.uniform(min_mult, max_mult) * 4) / 4  # Round to 0.25
+    return f"gap-{mult}"
+
+
+# ============================================================================
+# HEIGHT PATTERNS
+# ============================================================================
+
+def random_heights(count, low=1, high=4):
+    """
+    Random heights - trajectory validation ensures they're all reachable.
+    
+    Args:
+        count: Number of heights to generate
+        low: Minimum height
+        high: Maximum height
+        
+    Returns:
+        List of random heights
+    """
+    return [random.randint(low, high) for _ in range(count)]
+
+
+def alternating_heights(count, low=2, high=4):
+    """
+    Create alternating high-low pattern.
+    
+    Args:
+        count: Number of heights to generate
+        low: Low height value
+        high: High height value
+        
+    Returns:
+        List of alternating heights
+    """
+    heights = []
+    current = low
+    for _ in range(count):
+        heights.append(current)
+        current = high if current == low else low
+    return heights
+
+
+def wave_heights(count, low=1, high=4):
+    """
+    Create smooth wave pattern - up then down.
+    
+    Args:
+        count: Number of heights to generate
+        low: Minimum height
+        high: Maximum height
+        
+    Returns:
+        List of heights forming a wave pattern
+    """
+    mid = count // 2
+    ascending = [low + int((high - low) * i / mid) for i in range(mid)]
+    descending = list(reversed(ascending))
+    return (ascending + descending)[:count]
+
+
+def stepped_heights(count, low=1, high=4):
+    """
+    Create stepped pattern: gradually increase then reset.
+    
+    Args:
+        count: Number of heights to generate
+        low: Minimum height
+        high: Maximum height
+        
+    Returns:
+        List of heights in stepped pattern
+    """
+    step_size = 6
+    heights = []
+    for i in range(count):
+        if i % step_size == 0 and i > 0:
+            heights.append(low)  # Reset to low
+        else:
+            h = low + min(i % step_size, high - low)
+            heights.append(h)
+    return heights
+
+
+def constant_height(count, height=3):
+    """
+    All platforms at same height - rhythm without height changes.
+    
+    Args:
+        count: Number of heights to generate
+        height: Constant height value
+        
+    Returns:
+        List of identical heights
+    """
+    return [height] * count
+
+
+# ============================================================================
+# WIDTH PATTERNS
+# ============================================================================
+
+def varied_widths(count):
+    """
+    Mix of thin bars (2-3) and wide platforms (4-8).
+    
+    Args:
+        count: Number of widths to generate
+        
+    Returns:
+        List of varied widths
+    """
+    widths = []
+    for _ in range(count):
+        # 60% thin bars, 40% wide platforms
+        if random.random() < 0.6:
+            widths.append(random.randint(2, 3))  # Quick hops
+        else:
+            widths.append(random.randint(4, 8))  # Rest areas
+    return widths
+
+
+def rhythm_widths(count):
+    """
+    Rhythmic pattern of thin-wide-thin-wide.
+    
+    Args:
+        count: Number of widths to generate
+        
+    Returns:
+        List of widths in rhythmic pattern
+    """
+    pattern = [2, 2, 5, 2, 2, 6, 2, 2, 5]
+    widths = []
+    for i in range(count):
+        widths.append(pattern[i % len(pattern)])
+    return widths
+
+
+# ============================================================================
+# OBSTACLE BUILDERS
+# ============================================================================
+
+def create_pattern(name, description, obstacles, pattern_type, rhythm_hint):
+    """
+    Create pattern dictionary with metadata.
+    
+    Args:
+        name: Pattern name
+        description: Pattern description
+        obstacles: List of obstacle dictionaries
+        pattern_type: Type ("bar", "platform", "mixed")
+        rhythm_hint: Rhythm description
+        
+    Returns:
+        Pattern dictionary
+    """
+    return {
+        "name": name,
+        "description": description,
+        "obstacles": obstacles,
+        "metadata": {
+            "type": pattern_type,
+            "length": len(obstacles),
+            "rhythm": rhythm_hint,
+        },
+    }
+
+
+def create_platform(width, height, gap, gap_hazard=None):
+    """
+    Create a floating platform (bar type).
+    
+    Args:
+        width: Platform width in blocks
+        height: Platform height in blocks (0 = ground level)
+        gap: Gap multiplier or full gap_type (e.g., "gap-2.0" or just "2.0")
+        gap_hazard: Optional hazard type for the gap ("lava", "acid", None)
+        
+    Returns:
+        Obstacle dictionary
+    """
+    # If gap is just a number or gap-{number}, add hazard suffix if specified
+    if gap_hazard:
+        # Ensure gap starts with "gap-"
+        if not gap.startswith("gap-"):
+            gap_str = f"gap-{gap}"
+        else:
+            gap_str = gap
+        # Add hazard suffix
+        gap_type = f"{gap_str}-{gap_hazard}"
+    else:
+        # No hazard, use gap as-is (ensure it starts with "gap-")
+        if not gap.startswith("gap-"):
+            gap_type = f"gap-{gap}"
+        else:
+            gap_type = gap
+    
+    return {"bar_type": f"bar-{width}-{height}", "gap_type": gap_type}
+
+
+def create_floating_platform(width, floor_height, ceiling_height, gap, gap_hazard=None):
+    """
+    Create a floating platform suspended between floor and ceiling.
+    
+    Args:
+        width: Platform width in blocks
+        floor_height: Distance from ground to bottom of platform in blocks
+        ceiling_height: Distance from ground to top of platform in blocks
+        gap: Gap multiplier or full gap_type
+        gap_hazard: Optional hazard type for the gap ("lava", "acid", None)
+        
+    Returns:
+        Obstacle dictionary
+    """
+    # If gap is just a number or gap-{number}, add hazard suffix if specified
+    if gap_hazard:
+        # Ensure gap starts with "gap-"
+        if not gap.startswith("gap-"):
+            gap_str = f"gap-{gap}"
+        else:
+            gap_str = gap
+        # Add hazard suffix
+        gap_type = f"{gap_str}-{gap_hazard}"
+    else:
+        # No hazard, use gap as-is (ensure it starts with "gap-")
+        if not gap.startswith("gap-"):
+            gap_type = f"gap-{gap}"
+        else:
+            gap_type = gap
+    
+    return {"bar_type": f"bar-{width}-{floor_height}-{ceiling_height}", "gap_type": gap_type}
+
+
+========================================
+FILE: ./generators/pattern_library.py
+========================================
+
+"""
+Pattern Library - Pre-designed obstacle pattern generators
+
+Contains all pattern generator functions for creating varied gameplay experiences.
+Each pattern is physics-validated to ensure playability.
+"""
+
+import random
+from .obstacle_builders import (
+    create_pattern,
+    create_platform,
+    create_floating_platform,
+    random_gap,
+    random_heights,
+    alternating_heights,
+    wave_heights,
+    stepped_heights,
+    constant_height,
+    varied_widths,
+    rhythm_widths,
+    GAP_RHYTHM_SHORT,
+    GAP_RHYTHM_MEDIUM,
+    GAP_RHYTHM_LONG,
+    GAP_RHYTHM_VARIED
+)
+
+
+# ============================================================================
+# PATTERN GENERATORS
+# ============================================================================
+
+def steady_rhythm_v4():
+    """Simple steady rhythm - great for getting comfortable with the mechanic."""
+    obstacles = []
+    count = random.randint(25, 30)
+    
+    # First platform at ground level for accessibility
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))  # height=0 means ground level
+    
+    # Steady platforms at medium height
+    gaps = GAP_RHYTHM_MEDIUM
+    widths = [random.randint(3, 5) for _ in range(count)]
+    heights = constant_height(count, height=2)  # Constant at height 2 (60px)
+    
+    for i, (h, w) in enumerate(zip(heights, widths)):
+        gap = gaps[i % len(gaps)]
+        obstacles.append(create_platform(w, h, gap))
+    
+    return create_pattern(
+        "Steady Rhythm",
+        "Consistent platform hops at steady height",
+        obstacles,
+        "platform",
+        "4/4 steady"
+    )
+
+
+def wave_rider_v4():
+    """Wave pattern - heights go up and down smoothly."""
+    obstacles = []
+    count = random.randint(28, 35)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))
+    
+    # Wave heights with varied gaps
+    heights = wave_heights(count, low=1, high=4)
+    widths = varied_widths(count)
+    
+    for i, (h, w) in enumerate(zip(heights, widths)):
+        gap = random_gap(1.75, 2.25)
+        obstacles.append(create_platform(w, h, gap))
+    
+    return create_pattern(
+        "Wave Rider",
+        "Ride the wave - platforms rise and fall",
+        obstacles,
+        "platform",
+        "Flowing waves"
+    )
+
+
+def quick_hops_v4():
+    """Fast-paced quick hops on thin platforms."""
+    obstacles = []
+    count = random.randint(30, 40)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))
+    
+    # Quick hops - thin platforms, short gaps
+    gaps = GAP_RHYTHM_SHORT
+    heights = alternating_heights(count, low=1, high=3)
+    
+    for i, h in enumerate(heights):
+        gap = gaps[i % len(gaps)]
+        width = random.randint(2, 3)  # Thin platforms only
+        # Add lava to some gaps (20% chance)
+        gap_hazard = "lava" if random.random() < 0.2 else None
+        obstacles.append(create_platform(width, h, gap, gap_hazard))
+    
+    return create_pattern(
+        "Quick Hops",
+        "Fast-paced hopping on thin platforms - don't miss!",
+        obstacles,
+        "platform",
+        "Fast 8th notes"
+    )
+
+
+def rest_and_run_v4():
+    """Mix of rest platforms and running sections."""
+    obstacles = []
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))
+    
+    # Pattern: 3 quick hops -> 1 rest -> repeat
+    for section in range(random.randint(5, 7)):
+        # Quick section: 3 thin platforms with adequate gaps
+        for hop in range(3):
+            # Add lava to gaps occasionally (15% chance)
+            gap_hazard = "lava" if section > 0 and hop > 0 and random.random() < 0.15 else None
+            obstacles.append(create_platform(
+                width=random.randint(2, 3),
+                height=random.randint(1, 3),
+                gap=random_gap(1.75, 2.25),
+                gap_hazard=gap_hazard
+            ))
+        
+        # Rest platform: wide and stable
+        obstacles.append(create_platform(
+            width=random.randint(6, 8),
+            height=random.randint(2, 3),
+            gap=random_gap(2.0, 2.25)
+        ))
+    
+    return create_pattern(
+        "Rest and Run",
+        "Bursts of quick hops with rest platforms - catch your breath!",
+        obstacles,
+        "platform",
+        "Burst then rest"
+    )
+
+
+def stepped_ascent_v4():
+    """Gradual climb up then drop down."""
+    obstacles = []
+    count = random.randint(25, 32)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))
+    
+    # Stepped ascent
+    heights = stepped_heights(count, low=1, high=4)
+    widths = rhythm_widths(count)
+    gaps = GAP_RHYTHM_VARIED
+    
+    for i, (h, w) in enumerate(zip(heights, widths)):
+        gap = gaps[i % len(gaps)]
+        # Add lava on descents (30% chance when dropping)
+        gap_hazard = "lava" if i > 0 and heights[i] < heights[i-1] and random.random() < 0.3 else None
+        obstacles.append(create_platform(w, h, gap, gap_hazard))
+    
+    return create_pattern(
+        "Stepped Ascent",
+        "Climb the steps, then drop!",
+        obstacles,
+        "platform",
+        "Ascending steps"
+    )
+
+
+def zigzag_chaos_v4():
+    """Chaotic height changes - safe transitions."""
+    obstacles = []
+    count = random.randint(28, 35)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))
+    
+    # Random heights with safe transitions (no big drops)
+    heights = []
+    prev_height = 2
+    for _ in range(count):
+        # Avoid big drops - max drop of 1 level
+        max_down = max(1, prev_height - 1)
+        max_up = min(4, prev_height + 2)
+        height = random.randint(max_down, max_up)
+        heights.append(height)
+        prev_height = height
+    
+    widths = varied_widths(count)
+    
+    for i, (h, w) in enumerate(zip(heights, widths)):
+        gap = random_gap(1.75, 2.25)
+        # Add lava in gaps (25% chance)
+        gap_hazard = "lava" if random.random() < 0.25 else None
+        obstacles.append(create_platform(w, h, gap, gap_hazard))
+    
+    return create_pattern(
+        "Zigzag Chaos",
+        "Unpredictable heights - stay focused!",
+        obstacles,
+        "platform",
+        "Chaotic variation"
+    )
+
+
+def long_jumper_v4():
+    """Extended jumps - use the full jump distance."""
+    obstacles = []
+    count = random.randint(20, 25)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(5, 7), 0, "gap-2.0"))
+    
+    # Long jumps with wide landing platforms
+    gaps = GAP_RHYTHM_LONG
+    heights = alternating_heights(count, low=1, high=4)
+    
+    for i, h in enumerate(heights):
+        gap = gaps[i % len(gaps)]
+        width = random.randint(5, 8)  # Wide platforms for safe landing
+        # Add lava in longer gaps (35% chance)
+        gap_hazard = "lava" if random.random() < 0.35 else None
+        obstacles.append(create_platform(width, h, gap, gap_hazard))
+    
+    return create_pattern(
+        "Long Jumper",
+        "Maximum distance jumps - commit to the leap!",
+        obstacles,
+        "platform",
+        "Extended jumps"
+    )
+
+
+def mixed_madness_v4():
+    """Everything mixed - ultimate variety with safe height transitions."""
+    obstacles = []
+    count = random.randint(30, 40)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(4, 6), 0, "gap-2.0"))
+    
+    # Complete chaos - all patterns mixed but avoid big drops
+    heights = []
+    prev_height = 2  # Start at reasonable height
+    for _ in range(count):
+        # Don't drop more than 1 level at a time
+        max_drop = max(1, prev_height - 1)
+        max_up = min(4, prev_height + 2)
+        height = random.randint(max_drop, max_up)
+        heights.append(height)
+        prev_height = height
+    
+    widths = varied_widths(count)
+    all_gaps = GAP_RHYTHM_SHORT + GAP_RHYTHM_MEDIUM + GAP_RHYTHM_LONG
+    
+    for i, (h, w) in enumerate(zip(heights, widths)):
+        gap = random.choice(all_gaps)
+        # More lava for chaos (30% chance)!
+        gap_hazard = "lava" if random.random() < 0.3 else None
+        obstacles.append(create_platform(w, h, gap, gap_hazard))
+    
+    return create_pattern(
+        "Mixed Madness",
+        "Everything at once - ultimate variety!",
+        obstacles,
+        "platform",
+        "Total chaos"
+    )
+
+
+def kitchen_sink_v4():
+    """
+    ULTIMATE VARIETY: Combines everything!
+    - 30% floating platforms (bar-{width}-{floor}-{ceiling})
+    - 30% regular bars (bar-{width}-{height})
+    - Hazards in gaps (lava, spikes, etc.)
+    - Varied widths (2-8 blocks)
+    - 10%+ at max height (120px)
+    """
+    obstacles = []
+    count = random.randint(40, 50)
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(5, 7), 0, "gap-2.0"))
+    
+    # Available hazard types for gaps
+    HAZARD_TYPES = ["spikes", "saw", "lava", "electric", "laser", "poison"]
+    
+    # Track what we've created for proper distribution
+    platform_count = 0
+    bar_count = 0
+    max_height_count = 0
+    prev_height = 2  # Start at moderate height
+    
+    for i in range(count):
+        # Decide obstacle type based on current distribution
+        total = platform_count + bar_count
+        platform_ratio = platform_count / total if total > 0 else 0
+        bar_ratio = bar_count / total if total > 0 else 0
+        
+        # Width variation (2-8 blocks)
+        width = random.choice([2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8])
+        
+        # Height selection with safe transitions (no big drops)
+        max_down = max(1, prev_height - 1)
+        max_up = min(4, prev_height + 2)
+        
+        # Ensure 10%+ at max height 4
+        if max_height_count / (i + 1) < 0.10 and random.random() < 0.3:
+            height = 4  # Max height 120px
+            max_height_count += 1
+        else:
+            height = random.randint(max_down, max_up)
+            if height == 4:
+                max_height_count += 1
+        
+        prev_height = height  # Track for next iteration
+        
+        # Gap selection
+        gap = random.choice(GAP_RHYTHM_SHORT + GAP_RHYTHM_MEDIUM + GAP_RHYTHM_LONG)
+        
+        # Hazard in gap occasionally (15% chance)
+        gap_hazard = random.choice(HAZARD_TYPES) if random.random() < 0.15 else None
+        
+        # Choose obstacle type to maintain 30/30 distribution
+        if platform_ratio < 0.30 or (platform_ratio < 0.35 and bar_ratio >= 0.30):
+            # Create floating platform (suspended in air)
+            floor_height = height
+            ceiling_height = height + random.randint(2, 3)  # Platform thickness
+            obstacles.append(create_floating_platform(width, floor_height, ceiling_height, gap, gap_hazard))
+            platform_count += 1
+            
+        elif bar_ratio < 0.30 or (bar_ratio < 0.35 and platform_ratio >= 0.30):
+            # Create regular bar (on ground, various heights)
+            obstacles.append(create_platform(width, height, gap, gap_hazard))
+            bar_count += 1
+            
+        else:
+            # Random choice between platform and bar
+            if random.random() < 0.5:
+                floor_height = height
+                ceiling_height = height + random.randint(2, 3)
+                obstacles.append(create_floating_platform(width, floor_height, ceiling_height, gap, gap_hazard))
+                platform_count += 1
+            else:
+                obstacles.append(create_platform(width, height, gap, gap_hazard))
+                bar_count += 1
+    
+    return create_pattern(
+        "Kitchen Sink",
+        f"Everything! Platforms, bars, hazards - {platform_count}P/{bar_count}B, {max_height_count} at max height",
+        obstacles,
+        "mixed",
+        "Ultimate variety"
+    )
+
+
+def obstacle_course_v4():
+    """
+    MAXIMUM VARIETY with strategic sequences:
+    - Thin platform sequences (precision jumps)
+    - Wide bar rest areas (catch your breath)
+    - Hazard-filled gaps
+    - Mixed height challenges
+    - 30% platforms, 30% bars, varied hazards
+    """
+    obstacles = []
+    HAZARD_TYPES = ["spikes", "saw", "lava", "electric", "laser", "poison"]
+    
+    # First platform at ground level
+    obstacles.append(create_platform(random.randint(5, 7), 0, "gap-2.0"))
+    
+    # Stats tracking
+    platform_count = 0
+    bar_count = 0
+    max_height_count = 0
+    total_obstacles = 1  # Count the starting platform
+    
+    # Sequence 2: Thin platform precision section (5-7 platforms)
+    prev_height = 2  # Start at moderate height
+    for i in range(random.randint(5, 7)):
+        # Safe height transitions - no big drops
+        max_down = max(1, prev_height - 1)
+        max_up = min(4, prev_height + 1)
+        height = random.randint(max_down, max_up)
+        if height == 4:
+            max_height_count += 1
+        floor = height
+        ceiling = height + 2
+        # Add hazard to some gaps
+        gap_hazard = random.choice(HAZARD_TYPES) if i > 0 and random.random() < 0.2 else None
+        obstacles.append(create_floating_platform(2, floor, ceiling, random.choice(GAP_RHYTHM_SHORT), gap_hazard))
+        platform_count += 1
+        total_obstacles += 1
+        prev_height = height
+    
+    # Sequence 3: Wide bar rest area
+    obstacles.append(create_platform(random.randint(6, 8), random.randint(1, 2), "gap-2.0"))
+    bar_count += 1
+    total_obstacles += 1
+    
+    # Sequence 4: Mixed height bars (6-8 bars)
+    for _ in range(random.randint(6, 8)):
+        height = random.choice([1, 2, 3, 4, 4])  # Favor height 4
+        if height == 4:
+            max_height_count += 1
+        width = random.choice([3, 4, 5])
+        # Add hazards to some gaps
+        gap_hazard = random.choice(HAZARD_TYPES) if random.random() < 0.25 else None
+        obstacles.append(create_platform(width, height, random.choice(GAP_RHYTHM_MEDIUM), gap_hazard))
+        bar_count += 1
+        total_obstacles += 1
+    
+    # Sequence 5: Platform bridge (wide platforms at max height)
+    for _ in range(random.randint(4, 6)):
+        floor = 4
+        ceiling = random.randint(6, 7)
+        obstacles.append(create_floating_platform(random.randint(5, 7), floor, ceiling, random.choice(GAP_RHYTHM_MEDIUM)))
+        platform_count += 1
+        max_height_count += 1
+        total_obstacles += 1
+    
+    # Sequence 6: Gradual descent (no big drops!)
+    for h in [4, 3, 3, 2, 2, 1]:
+        obstacles.append(create_platform(random.randint(3, 5), h, "gap-2.0"))
+        bar_count += 1
+        if h == 4:
+            max_height_count += 1
+        total_obstacles += 1
+    
+    # Sequence 7: Final mixed chaos (balance to 30/30 distribution)
+    remaining = random.randint(8, 12)
+    for _ in range(remaining):
+        total = platform_count + bar_count
+        platform_ratio = platform_count / total if total > 0 else 0
+        bar_ratio = bar_count / total if total > 0 else 0
+        
+        height = random.randint(1, 4)
+        if height == 4:
+            max_height_count += 1
+        
+        if platform_ratio < 0.30:
+            # Add platform
+            floor = height
+            ceiling = height + random.randint(2, 3)
+            width = random.choice([2, 3, 4, 5, 6])
+            obstacles.append(create_floating_platform(width, floor, ceiling, random.choice(GAP_RHYTHM_MEDIUM + GAP_RHYTHM_LONG)))
+            platform_count += 1
+        elif bar_ratio < 0.30:
+            # Add bar
+            width = random.choice([2, 3, 4, 5, 6, 7, 8])
+            obstacles.append(create_platform(width, height, random.choice(GAP_RHYTHM_MEDIUM + GAP_RHYTHM_LONG)))
+            bar_count += 1
+        else:
+            # Random choice
+            if random.random() < 0.5:
+                floor = height
+                ceiling = height + 2
+                obstacles.append(create_floating_platform(random.randint(2, 6), floor, ceiling, random.choice(GAP_RHYTHM_MEDIUM)))
+                platform_count += 1
+            else:
+                obstacles.append(create_platform(random.randint(2, 7), height, random.choice(GAP_RHYTHM_MEDIUM)))
+                bar_count += 1
+        total_obstacles += 1
+    
+    max_height_pct = int(100 * max_height_count / total_obstacles)
+    platform_pct = int(100 * platform_count / total_obstacles)
+    bar_pct = int(100 * bar_count / total_obstacles)
+    
+    return create_pattern(
+        "Obstacle Course",
+        f"Strategic sequences: {platform_count}P({platform_pct}%)/{bar_count}B({bar_pct}%), {max_height_count}({max_height_pct}%) max height",
+        obstacles,
+        "mixed",
+        "Varied sequences"
+    )
+
+
+# ============================================================================
+# DIFFICULTY SCALING
+# ============================================================================
+
+def scale_pattern_widths(obstacles, scale_factor):
+    """
+    Scale all platform/bar widths by scale_factor.
+    For example: 1.0 = hard (no change), 1.15 = medium (+15%), 1.25 = easy (+25%)
+    
+    Args:
+        obstacles: List of obstacle dictionaries
+        scale_factor: Width multiplier (e.g., 1.15 for +15%)
+        
+    Returns:
+        New list of scaled obstacles
+    """
+    scaled_obstacles = []
+    for obs in obstacles:
+        scaled_obs = obs.copy()
+        bar_type = obs.get('bar_type', '')
+        
+        if bar_type.startswith('bar-'):
+            parts = bar_type.replace('bar-', '').split('-')
+            if len(parts) >= 2:
+                # Scale the width (first number)
+                original_width = int(parts[0])
+                new_width = max(2, int(original_width * scale_factor))  # Min width of 2
+                
+                # Reconstruct bar_type with new width
+                if len(parts) == 3:
+                    # Floating platform: bar-{width}-{floor}-{ceiling}
+                    scaled_obs['bar_type'] = f"bar-{new_width}-{parts[1]}-{parts[2]}"
+                else:
+                    # Regular bar: bar-{width}-{height}
+                    scaled_obs['bar_type'] = f"bar-{new_width}-{parts[1]}"
+        
+        scaled_obstacles.append(scaled_obs)
+    
+    return scaled_obstacles
+
+
+def generate_difficulty_variants(pattern_func):
+    """
+    Generate easy, medium, and hard variants of a pattern.
+    
+    Args:
+        pattern_func: Pattern generator function
+        
+    Returns:
+        List of (pattern, difficulty_suffix) tuples
+    """
+    # Generate base pattern
+    base_pattern = pattern_func()
+    base_obstacles = base_pattern['obstacles']
+    
+    variants = []
+    
+    # Hard (original, no scaling)
+    hard_pattern = create_pattern(
+        base_pattern['name'] + " (Hard)",
+        base_pattern['description'],
+        base_obstacles,
+        base_pattern['metadata']['type'],
+        base_pattern['metadata']['rhythm']
+    )
+    variants.append((hard_pattern, "_hard"))
+    
+    # Medium (+15% width)
+    medium_obstacles = scale_pattern_widths(base_obstacles, 1.15)
+    medium_pattern = create_pattern(
+        base_pattern['name'] + " (Medium)",
+        base_pattern['description'],
+        medium_obstacles,
+        base_pattern['metadata']['type'],
+        base_pattern['metadata']['rhythm']
+    )
+    variants.append((medium_pattern, "_medium"))
+    
+    # Easy (+25% width)
+    easy_obstacles = scale_pattern_widths(base_obstacles, 1.25)
+    easy_pattern = create_pattern(
+        base_pattern['name'] + " (Easy)",
+        base_pattern['description'],
+        easy_obstacles,
+        base_pattern['metadata']['type'],
+        base_pattern['metadata']['rhythm']
+    )
+    variants.append((easy_pattern, "_easy"))
+    
+    return variants
+
+
+========================================
+FILE: ./generators/physics_engine.py
+========================================
+
+"""
+Physics Engine & Trajectory Validation
+
+Provides physics calculations and pattern validation for the Geometry Dash clone.
+Uses exact game physics constants to validate that obstacle patterns are playable.
+"""
+
+# Core physics constants (must match config.py exactly)
+GRAVITY = 0.8
+JUMP_POWER = -15
+PLAYER_SPEED = 6
+GROUND_Y = 600
+PLAYER_WIDTH = 40
+PLAYER_HEIGHT = 40
+
+# Derived physics values
+max_jump_height = (abs(JUMP_POWER) ** 2) / (2 * GRAVITY)
+MAX_OBSTACLE_HEIGHT = int(max_jump_height * 0.7)  # 98px
+time_to_peak = abs(JUMP_POWER) / GRAVITY
+total_air_time = time_to_peak * 2
+MAX_JUMP_DISTANCE = int(total_air_time * PLAYER_SPEED)  # 225px
+
+# Viewport constraints
+MIN_PLATFORM_HEIGHT = 1  # 30px above ground (allow starting platform)
+MAX_PLATFORM_HEIGHT = 4  # 120px above ground (top 20% empty)
+
+
+def calculate_jump_trajectory(start_x, start_y, num_steps=50):
+    """
+    Calculate the parabolic jump arc from a starting position.
+    Returns list of (x, y) points along the jump path.
+    
+    Player jumps with JUMP_POWER, moves forward with PLAYER_SPEED, pulled down by GRAVITY.
+    
+    Args:
+        start_x: Starting X position
+        start_y: Starting Y position (top of platform)
+        num_steps: Number of simulation steps
+        
+    Returns:
+        List of (x, y) tuples representing the jump trajectory
+    """
+    trajectory = []
+    x = start_x
+    y = start_y
+    velocity_y = JUMP_POWER
+    
+    for _ in range(num_steps):
+        trajectory.append((x, y))
+        
+        # Update position
+        x += PLAYER_SPEED
+        y += velocity_y
+        velocity_y += GRAVITY
+        
+        # Stop if we hit ground or go too far
+        if y >= GROUND_Y or x > start_x + MAX_JUMP_DISTANCE + 100:
+            break
+    
+    return trajectory
+
+
+def platform_intersects_trajectory(trajectory, platform_x, platform_top, platform_width, debug=False):
+    """
+    Check if a platform intersects the jump trajectory.
+    Player can land on platform if any point in trajectory is within platform bounds.
+    
+    Args:
+        trajectory: List of (x, y) points from calculate_jump_trajectory
+        platform_x: Left edge of platform
+        platform_top: Top edge of platform (Y coordinate)
+        platform_width: Width of platform in pixels
+        debug: Print debug info if True
+    
+    Returns:
+        True if player can land on this platform from the jump arc
+    """
+    platform_right = platform_x + platform_width
+    
+    # Track if we found any horizontal overlap
+    horizontal_overlaps = []
+    
+    for i, (x, y) in enumerate(trajectory):
+        # Check if trajectory point is horizontally within platform bounds
+        # Player's left edge is at x, right edge at x + PLAYER_WIDTH
+        player_left = x
+        player_right = x + PLAYER_WIDTH
+        
+        # Does player overlap platform horizontally?
+        if player_right >= platform_x and player_left <= platform_right:
+            horizontal_overlaps.append((i, x, y))
+            
+            # Check if player is at or just above platform top (can land on it)
+            # Player lands when their bottom (y + PLAYER_HEIGHT) touches platform top
+            player_bottom = y + PLAYER_HEIGHT
+            
+            if player_bottom >= platform_top - 5:  # 5px tolerance
+                if debug:
+                    print(f"    ✓ Landing at trajectory point {i}: player_bottom={player_bottom}, platform_top={platform_top}")
+                return True
+    
+    if debug and horizontal_overlaps:
+        print(f"    Found {len(horizontal_overlaps)} horizontal overlaps but no valid landing")
+        for i, x, y in horizontal_overlaps[:3]:  # Show first 3
+            player_bottom = y + PLAYER_HEIGHT
+            print(f"      Point {i}: x={x}, player_bottom={player_bottom}, platform_top={platform_top}, diff={player_bottom - platform_top}")
+    
+    return False
+
+
+def can_reach_platform(prev_platform, next_platform, debug=False):
+    """
+    Check if player can jump from prev_platform and land on next_platform.
+    
+    Platform format: {'x': int, 'y_top': int, 'width': int, 'height': int}
+    
+    Args:
+        prev_platform: Dictionary with platform properties (x, y_top, width, height)
+        next_platform: Dictionary with platform properties (x, y_top, width, height)
+        debug: Print debug info if True
+        
+    Returns:
+        Tuple (can_reach: bool, reason: str)
+    """
+    # Player starts jump from right edge of previous platform
+    jump_start_x = prev_platform['x'] + prev_platform['width']
+    jump_start_y = prev_platform['y_top']
+    
+    # Calculate jump arc
+    trajectory = calculate_jump_trajectory(jump_start_x, jump_start_y)
+    
+    if debug:
+        print(f"\n  Jump from x={jump_start_x}, y={jump_start_y} (height={prev_platform['height']})")
+        print(f"  Target platform: x={next_platform['x']}, y_top={next_platform['y_top']} (height={next_platform['height']})")
+        print(f"  Gap distance: {next_platform['x'] - jump_start_x}px")
+        print(f"  Trajectory has {len(trajectory)} points")
+        if trajectory:
+            print(f"  Trajectory range: x={trajectory[0][0]}-{trajectory[-1][0]}, y={min(p[1] for p in trajectory)}-{max(p[1] for p in trajectory)}")
+    
+    # Check if next platform intersects the arc
+    intersects = platform_intersects_trajectory(
+        trajectory,
+        next_platform['x'],
+        next_platform['y_top'],
+        next_platform['width'],
+        debug=debug
+    )
+    
+    if intersects:
+        return True, "Platform reachable via jump arc"
+    
+    # Check horizontal distance as fallback diagnostic
+    distance = next_platform['x'] - jump_start_x
+    if distance > MAX_JUMP_DISTANCE:
+        return False, f"Gap {distance}px exceeds max jump {MAX_JUMP_DISTANCE}px"
+    
+    return False, f"Platform not in jump arc (gap={distance}px, height_diff={next_platform['y_top'] - jump_start_y}px)"
+
+
+def validate_pattern(pattern_data):
+    """
+    Validate pattern using trajectory-based physics.
+    Each platform must be reachable via jump arc from previous platform.
+    
+    Args:
+        pattern_data: Dictionary containing pattern obstacles and metadata
+        
+    Returns:
+        Tuple (is_valid: bool, error_msg: str, touches_ground: bool)
+    """
+    obstacles_data = pattern_data.get('obstacles', [])
+    
+    if not obstacles_data:
+        return False, "No obstacles in pattern", False
+    
+    # Convert pattern data to platform positions
+    platforms = []
+    current_x = 800  # Starting X position
+    touches_ground = False  # Track if any jump path reaches ground
+    
+    for obs in obstacles_data:
+        # Parse bar type
+        bar_type = obs.get('bar_type', '')
+        parts = bar_type.replace('bar-', '').split('-')
+        
+        # Determine height based on format
+        if len(parts) == 3:
+            # Floating platform: bar-{width}-{floor}-{ceiling}
+            width = int(parts[0]) * 30
+            floor_height = int(parts[1]) * 30
+            ceiling_height = int(parts[2]) * 30
+            # Platform top is at ceiling height
+            height = ceiling_height
+        elif len(parts) >= 2:
+            # Regular bar: bar-{width}-{height}
+            width = int(parts[0]) * 30
+            height = int(parts[1]) * 30
+        else:
+            width, height = 30, 30
+        
+        # Parse gap
+        gap_type = obs.get('gap_type', 'gap-1.5')
+        # Extract gap multiplier (remove 'gap-' prefix and any hazard suffix like '-lava')
+        gap_str = gap_type.replace('gap-', '').split('-')[0]  # Get first part (the multiplier)
+        gap_mult = float(gap_str)
+        gap_after = int(gap_mult * 100)
+        
+        platform = {
+            'x': current_x,
+            'y_top': GROUND_Y - height,
+            'width': width,
+            'height': height,
+            'is_killzone': obs.get('is_killzone', False)
+        }
+        platforms.append(platform)
+        current_x += width + gap_after
+    
+    # Validate each platform is reachable from previous
+    for i in range(1, len(platforms)):
+        if platforms[i]['is_killzone']:
+            continue  # Skip killzone validation
+        
+        prev = platforms[i - 1]
+        current = platforms[i]
+        
+        # Skip if previous is killzone - player must jump from ground
+        if prev['is_killzone']:
+            # Check if reachable from ground level
+            ground_platform = {'x': prev['x'], 'y_top': GROUND_Y, 'width': prev['width'], 'height': 0}
+            can_reach, reason = can_reach_platform(ground_platform, current, debug=True)
+            if not can_reach:
+                return False, f"Obstacle {i}: Not reachable from ground after lava - {reason}", touches_ground
+            touches_ground = True  # Jump from ground
+            continue
+        
+        # Calculate trajectory and check if it touches ground
+        jump_start_x = prev['x'] + prev['width']
+        jump_start_y = prev['y_top']
+        trajectory = calculate_jump_trajectory(jump_start_x, jump_start_y)
+        
+        # Check if trajectory reaches ground (y >= GROUND_Y)
+        for x, y in trajectory:
+            if y + PLAYER_HEIGHT >= GROUND_Y:  # Player bottom touches ground
+                touches_ground = True
+                break
+        
+        can_reach, reason = can_reach_platform(prev, current, debug=False)
+        if not can_reach:
+            # Enable debug for failed validation
+            print(f"\n❌ Validation failed at obstacle {i}:")
+            can_reach_platform(prev, current, debug=True)
+            return False, f"Obstacle {i}: {reason}", touches_ground
+    
+    return True, "Pattern is valid", touches_ground
+
+
+========================================
+FILE: ./kivy_game/game.py
+========================================
+
+"""
+Main Kivy Game Widget
+Coordinates all game systems for iOS/mobile version.
+"""
+
+from kivy.uix.widget import Widget
+from kivy.graphics import Color, Rectangle, Line
+from kivy.clock import Clock
+from kivy.core.window import Window
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+
+from .config import *
+from .player import Player
+from .obstacles import ObstacleGenerator
+from managers.score_manager import ScoreManager
+
+
+class GameWidget(Widget):
+    """Main game widget coordinating all systems."""
+    
+    def __init__(self, **kwargs):
+        super(GameWidget, self).__init__(**kwargs)
+        
+        # Game state
+        self.game_over = False
+        self.paused = False
+        self.difficulty = "medium"
+        self.player_name = "Guest"
+        
+        print(f"\n🎮 KIVY GAME INIT")
+        print(f"   Window size: {Window.size}")
+        print(f"   Difficulty: {self.difficulty}")
+        
+        # Initialize game systems
+        self.player = Player(PLAYER_START_X, GROUND_Y)
+        print(f"   Player position: ({self.player.x}, {self.player.y})")
+        print(f"   Player size: {PLAYER_SIZE}x{PLAYER_SIZE}")
+        print(f"   Ground Y: {GROUND_Y}")
+        
+        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
+        self.score_manager = ScoreManager(player_name=self.player_name)
+        
+        # Score tracking
+        self.distance_traveled = 0
+        self.last_score = 0
+        
+        print(f"   Obstacles: {len(self.obstacle_generator.obstacles)}")
+        print(f"   Generating initial obstacles...")
+        
+        # Generate initial obstacles
+        for _ in range(3):
+            self.obstacle_generator.generate_obstacle()
+        
+        print(f"   Total obstacles after init: {len(self.obstacle_generator.obstacles)}")
+        if self.obstacle_generator.obstacles:
+            first_obs = self.obstacle_generator.obstacles[0]
+            print(f"   First obstacle: x={first_obs.x}, y={first_obs.y}, w={first_obs.width}, h={first_obs.height}")
+        print(f"🎮 INIT COMPLETE\n")
+        
+        # Setup background
+        with self.canvas.before:
+            # Sky gradient (simplified - just solid color for now)
+            Color(*SKY_BLUE)
+            self.bg_rect = Rectangle(pos=(0, 0), size=Window.size)
+            
+            # Ground
+            Color(*GROUND_GREEN)
+            self.ground_rect = Rectangle(
+                pos=(0, 0),
+                size=(Window.size[0], GROUND_Y)
+            )
+        
+        # Add player to canvas
+        self.add_widget(self.player)
+        
+        # Create UI labels
+        self.score_label = Label(
+            text="Score: 0",
+            font_size='20sp',
+            pos=(10, Window.height - 40),
+            size_hint=(None, None)
+        )
+        self.add_widget(self.score_label)
+        
+        self.high_score_label = Label(
+            text=f"High Score: {self.score_manager.high_score}",
+            font_size='16sp',
+            pos=(10, Window.height - 70),
+            size_hint=(None, None)
+        )
+        self.add_widget(self.high_score_label)
+        
+        # Create jump button for touch input
+        self.jump_button = Button(
+            text="JUMP",
+            size_hint=(None, None),
+            size=(150, 80),
+            pos=(Window.width - 170, 20),
+            font_size='24sp'
+        )
+        self.jump_button.bind(on_press=self.on_jump_button)
+        self.add_widget(self.jump_button)
+        
+        # Schedule game update loop
+        Clock.schedule_interval(self.update, 1/FPS)
+    
+    def on_jump_button(self, instance):
+        """Handle jump button press."""
+        if not self.game_over and not self.paused:
+            self.player.jump()
+    
+    def on_touch_down(self, touch):
+        """Handle touch input (tap anywhere to jump)."""
+        if not self.game_over and not self.paused:
+            # Allow jumping anywhere on screen, not just button
+            self.player.jump()
+        return super(GameWidget, self).on_touch_down(touch)
+    
+    def update(self, dt):
+        """Main game update loop."""
+        if self.game_over or self.paused:
+            return
+        
+        # Update player
+        self.player.update(dt)
+        
+        # Update obstacles
+        self.obstacle_generator.update(dt)
+        
+        # Update distance and score
+        self.distance_traveled += PLAYER_SPEED
+        self.score_manager.update_distance(PLAYER_SPEED)
+        current_score = self.score_manager.get_score()
+        
+        if current_score > self.last_score:
+            self.last_score = current_score
+            self.score_label.text = f"Score: {current_score}"
+        
+        # Check collisions
+        if self.obstacle_generator.check_collision(self.player):
+            self.handle_game_over()
+        
+        # Check if player fell off screen
+        if self.player.y < -100:
+            self.handle_game_over()
+        
+        # Render obstacles
+        self.render_obstacles()
+    
+    def render_obstacles(self):
+        """Render all obstacles on canvas."""
+        # Remove old obstacle widgets
+        for child in self.children[:]:
+            if isinstance(child, type(self.obstacle_generator.obstacles[0] if self.obstacle_generator.obstacles else None)):
+                self.remove_widget(child)
+        
+        # Add current obstacles
+        for obstacle in self.obstacle_generator.obstacles:
+            if obstacle not in self.children:
+                self.add_widget(obstacle)
+    
+    def handle_game_over(self):
+        """Handle game over state."""
+        self.game_over = True
+        self.score_manager.check_and_save_high_score()
+        
+        # Show game over screen
+        game_over_label = Label(
+            text=f"GAME OVER\\nScore: {self.last_score}\\nHigh Score: {self.score_manager.high_score}",
+            font_size='32sp',
+            pos=(Window.width/2 - 150, Window.height/2),
+            size_hint=(None, None),
+            halign='center'
+        )
+        self.add_widget(game_over_label)
+        
+        # Restart button
+        restart_button = Button(
+            text="Restart",
+            size_hint=(None, None),
+            size=(200, 60),
+            pos=(Window.width/2 - 100, Window.height/2 - 100),
+            font_size='24sp'
+        )
+        restart_button.bind(on_press=self.restart_game)
+        self.add_widget(restart_button)
+    
+    def restart_game(self, instance):
+        """Restart the game."""
+        # Stop the current update loop
+        Clock.unschedule(self.update)
+        
+        # Clear all widgets
+        self.clear_widgets()
+        self.canvas.clear()
+        
+        # Reset game state
+        self.game_over = False
+        self.paused = False
+        self.distance_traveled = 0
+        self.last_score = 0
+        
+        # Reinitialize game systems
+        self.player = Player(PLAYER_START_X, GROUND_Y)
+        self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty)
+        self.score_manager.reset()
+        
+        # Regenerate initial obstacles
+        for _ in range(3):
+            self.obstacle_generator.generate_obstacle()
+        
+        # Setup background again
+        with self.canvas.before:
+            Color(*SKY_BLUE)
+            self.bg_rect = Rectangle(pos=(0, 0), size=Window.size)
+            Color(*GROUND_GREEN)
+            self.ground_rect = Rectangle(pos=(0, 0), size=(Window.size[0], GROUND_Y))
+        
+        # Add player to canvas
+        self.add_widget(self.player)
+        
+        # Recreate UI labels
+        self.score_label = Label(
+            text="Score: 0",
+            font_size='20sp',
+            pos=(10, Window.height - 40),
+            size_hint=(None, None)
+        )
+        self.add_widget(self.score_label)
+        
+        self.high_score_label = Label(
+            text=f"High Score: {self.score_manager.high_score}",
+            font_size='16sp',
+            pos=(10, Window.height - 70),
+            size_hint=(None, None)
+        )
+        self.add_widget(self.high_score_label)
+        
+        # Recreate jump button
+        self.jump_button = Button(
+            text="JUMP",
+            size_hint=(None, None),
+            size=(150, 80),
+            pos=(Window.width - 170, 20),
+            font_size='24sp'
+        )
+        self.jump_button.bind(on_press=self.on_jump_button)
+        self.add_widget(self.jump_button)
+        
+        # Restart game update loop
+        Clock.schedule_interval(self.update, 1/FPS)
+
+
+========================================
+FILE: ./kivy_game/obstacles.py
+========================================
+
+"""
+Kivy Obstacle Widget
+Ported from Pygame version to use Kivy graphics.
+"""
+
+from kivy.uix.widget import Widget
+from kivy.graphics import Color, Rectangle
+from kivy.properties import NumericProperty, BooleanProperty
+from kivy.core.image import Image as CoreImage
+import os
+import random
+
+from .config import *
+
+
+class Obstacle(Widget):
+    """Single obstacle widget."""
+    
+    def __init__(self, x, height, width=30, y_offset=0, is_killzone=False, hazard_type="lava", **kwargs):
+        super(Obstacle, self).__init__(**kwargs)
+        
+        self.x = x
+        self.is_killzone = is_killzone
+        self.hazard_type = hazard_type
+        self.width = width
+        self.height = height
+        self.y_offset = y_offset
+        
+        if is_killzone:
+            # Killzone fills from ground to bottom
+            self.y = 0
+            self.height = GROUND_Y + PLAYER_SIZE - 5
+        else:
+            # Normal obstacle
+            self.y = GROUND_Y + y_offset
+        
+        self.size = (self.width, self.height)
+        self.pos = (self.x, self.y)
+        self.passed = False
+        
+        # Visual effects
+        self.landing_squish = 0
+        self.landing_glow = 0
+        self.landing_blink = 0
+        
+        # Set up graphics
+        with self.canvas:
+            if self.is_killzone:
+                # Red hazard warning pattern
+                Color(1, 0, 0, 0.7)
+                self.rect = Rectangle(pos=self.pos, size=self.size)
+            else:
+                # Purple obstacle
+                Color(*OBSTACLE_PURPLE)
+                self.rect = Rectangle(pos=self.pos, size=self.size)
+    
+    def update(self, dt):
+        """Move obstacle left and update visual effects."""
+        self.x -= PLAYER_SPEED
+        self.pos = (self.x, self.y)
+        self.rect.pos = self.pos
+        
+        # Decay landing effects
+        if self.landing_squish > 0:
+            self.landing_squish *= 0.85
+        if self.landing_glow > 0:
+            self.landing_glow *= 0.9
+        if self.landing_blink > 0:
+            self.landing_blink -= 1
+    
+    def trigger_landing_effect(self):
+        """Trigger visual landing effects when player lands on this obstacle."""
+        self.landing_squish = 0.25
+        self.landing_glow = 180
+        self.landing_blink = 6
+    
+    def get_rect(self):
+        """Get collision rectangle."""
+        return {
+            'x': self.x,
+            'y': self.y,
+            'width': self.width,
+            'height': self.height,
+            'left': self.x,
+            'right': self.x + self.width,
+            'top': self.y + self.height,
+            'bottom': self.y
+        }
+
+
+class ObstacleGenerator:
+    """Generates obstacles using pattern system."""
+    
+    def __init__(self, difficulty="medium"):
+        from managers.pattern_manager import PatternManager
+        from managers.bar_type_manager import BarTypeManager
+        
+        self.obstacles = []
+        self.pattern_manager = PatternManager(difficulty=difficulty)
+        self.bar_type_manager = BarTypeManager()
+        self.difficulty = difficulty
+        self.base_x = SCREEN_WIDTH
+        
+    def generate_obstacle(self):
+        """Generate next obstacle using pattern system."""
+        # Get random pattern (pattern manager already filtered by difficulty)
+        pattern = self.pattern_manager.get_random_pattern()
+        
+        if not pattern:
+            return None
+        
+        # Generate all obstacles from pattern
+        for obstacle_def in pattern['obstacles']:
+            bar_type = obstacle_def.get('bar_type', 'bar-3-2')
+            gap_type = obstacle_def.get('gap_type', 'gap-1.5')
+            is_killzone = obstacle_def.get('is_killzone', False)
+            hazard_type = obstacle_def.get('hazard_type', 'lava')
+            
+            # Get bar dimensions (returns tuple: width, height, y_offset)
+            width, height, y_offset = self.bar_type_manager.get_bar_dimensions(bar_type)
+            
+            # Create obstacle
+            obstacle = Obstacle(
+                self.base_x,
+                height,
+                width,
+                y_offset,
+                is_killzone,
+                hazard_type
+            )
+            self.obstacles.append(obstacle)
+            
+            # Calculate gap using bar_type_manager
+            gap = self.bar_type_manager.get_gap_distance(gap_type)
+            gap_hazard = self.bar_type_manager.get_gap_hazard(gap_type)
+            
+            # TODO: Handle gap hazards (lava/laser between obstacles)
+            # For now, just use the gap distance
+            
+            self.base_x += width + (gap if gap else 150)
+    
+    def update(self, dt):
+        """Update all obstacles."""
+        for obstacle in self.obstacles[:]:
+            obstacle.update(dt)
+            if obstacle.x + obstacle.width < 0:
+                self.obstacles.remove(obstacle)
+        
+        # Generate new obstacles when needed
+        if not self.obstacles or self.obstacles[-1].x < SCREEN_WIDTH - 200:
+            self.generate_obstacle()
+    
+    def check_collision(self, player):
+        """Check collision between player and obstacles."""
+        player_rect = player.get_rect()
+        
+        for obstacle in self.obstacles:
+            if self._rects_collide(player_rect, obstacle.get_rect()):
+                if obstacle.is_killzone:
+                    return True  # Game over
+                else:
+                    # Check if landing on top
+                    if player.velocity_y < 0 and player_rect['bottom'] <= obstacle.get_rect()['top']:
+                        landed = player.land_on_obstacle(obstacle.y + obstacle.height, obstacle)
+                        if landed:
+                            obstacle.trigger_landing_effect()
+                    else:
+                        return True  # Side collision - game over
+        
+        return False
+    
+    def _rects_collide(self, rect1, rect2):
+        """Check if two rectangles collide."""
+        return (rect1['right'] > rect2['left'] and
+                rect1['left'] < rect2['right'] and
+                rect1['top'] > rect2['bottom'] and
+                rect1['bottom'] < rect2['top'])
+
+
+========================================
+FILE: ./main.py
+========================================
+
+#!/usr/bin/env python3
+"""
+Geo Dash - Main Entry Point
+
+A Geometry Dash clone built with Pygame featuring physics-validated obstacle
+generation, custom asset support, and modular architecture.
+
+Usage:
+    python main.py
+"""
+
+if __name__ == "__main__":
+    from game.geo_dash import main
+    main()
+
+
+========================================
+FILE: ./managers/__init__.py
+========================================
+
+"""Manager modules for game systems."""
+
+
+========================================
+FILE: ./managers/bar_type_manager.py
+========================================
+
+"""
+Bar type manager for loading and resolving reusable obstacle bar templates.
+"""
+
+import json
+from core.physics import physics
+
+
+class BarTypeManager:
+    """Manages bar type definitions and resolves them to actual dimensions."""
+    
+    def __init__(self):
+        self.bar_types = {}
+        self.gap_types = {}
+        self.base_width = 30
+        self.base_height = 30  # Will be calculated from physics
+        self._load_bar_types()
+    
+    def _load_bar_types(self):
+        """Load bar type definitions from JSON file."""
+        try:
+            with open('data/bar_types.json', 'r') as f:
+                data = json.load(f)
+            
+            # Get base unit configuration
+            base_unit = data.get('base_unit', {})
+            self.base_width = base_unit.get('width', 30)
+            self.base_height = base_unit.get('height', 30)
+            
+            # Get gap unit configuration
+            gap_unit = data.get('gap_unit', {})
+            self.gap_unit_distance = gap_unit.get('base_distance', 100)
+            
+            # Load all bar type definitions
+            self.bar_types = data.get('bar_types', {})
+            
+            # Load gap type definitions
+            self.gap_types = data.get('gap_types', {})
+            
+            print(f"Bar Types: Loaded {len(self.bar_types)} bar types, {len(self.gap_types)} gap types")
+            print(f"  Base unit: {self.base_width}px wide × {self.base_height}px tall")
+            print(f"  Gap unit: {self.gap_unit_distance}px (multiplier-based)")
+            
+        except FileNotFoundError:
+            print("Warning: bar_types.json not found, using defaults only")
+            self.bar_types = {}
+        except json.JSONDecodeError as e:
+            print(f"Error: Could not parse bar_types.json: {e}")
+            self.bar_types = {}
+    
+    def get_bar_dimensions(self, bar_type):
+        """
+        Get actual width and height for a bar type.
+        Supports multiple formats:
+        - Predefined types from bar_types.json
+        - Dynamic: 'bar-{width}-{height}' (e.g., 'bar-2-3')
+        - Floating: 'bar-{width}-{floor}-{ceiling}' (e.g., 'bar-4-2-5')
+          floor = height from ground, ceiling = height from floor
+        
+        Args:
+            bar_type: String name of bar type
+        
+        Returns:
+            Tuple of (width, height, y_offset) in pixels
+            y_offset is 0 for ground obstacles, >0 for floating platforms
+        """
+        # Try predefined bar types first
+        if bar_type in self.bar_types:
+            bar_def = self.bar_types[bar_type]
+            width_mult = bar_def.get('width_multiplier', 1)
+            height_mult = bar_def.get('height_multiplier', 1)
+            
+            width = int(self.base_width * width_mult)
+            height = int(self.base_height * height_mult)
+            
+            # Check if it has floor offset (floating platform)
+            floor_mult = bar_def.get('floor_multiplier', 0)
+            y_offset = int(self.base_height * floor_mult)
+            
+            return (width, height, y_offset)
+        
+        # Try parsing dynamic formats
+        if bar_type.startswith('bar-'):
+            try:
+                parts = bar_type.split('-')
+                
+                if len(parts) == 4:
+                    # Floating platform: bar-{width}-{floor}-{ceiling}
+                    width_mult = float(parts[1])
+                    floor_mult = float(parts[2])
+                    ceiling_mult = float(parts[3])
+                    
+                    width = int(self.base_width * width_mult)
+                    y_offset = int(self.base_height * floor_mult)
+                    height = int(self.base_height * ceiling_mult)
+                    
+                    return (width, height, y_offset)
+                    
+                elif len(parts) == 3:
+                    # Ground obstacle: bar-{width}-{height}
+                    width_mult = float(parts[1])
+                    height_mult = float(parts[2])
+                    
+                    width = int(self.base_width * width_mult)
+                    height = int(self.base_height * height_mult)
+                    
+                    return (width, height, 0)
+            except (ValueError, IndexError):
+                pass
+        
+        print(f"Warning: Unknown bar type '{bar_type}'")
+        return None
+    
+    def list_bar_types(self):
+        """Get list of all available bar type names."""
+        return list(self.bar_types.keys())
+    
+    def get_bar_info(self, bar_type):
+        """Get full information about a bar type including description."""
+        if bar_type not in self.bar_types:
+            return None
+        
+        bar_def = self.bar_types[bar_type].copy()
+        width, height = self.get_bar_dimensions(bar_type)
+        bar_def['actual_width'] = width
+        bar_def['actual_height'] = height
+        return bar_def
+    
+    def get_gap_distance(self, gap_type):
+        """
+        Get actual distance for a gap type.
+        Supports both predefined types and dynamic format: 
+        - 'gap-{multiplier}' (e.g., 'gap-1', 'gap-2.5')
+        - 'gap-{multiplier}-{hazard}' (e.g., 'gap-1.75-lava', 'gap-2.0-acid', 'gap-2.25-none')
+        
+        Args:
+            gap_type: String name of gap type
+        
+        Returns:
+            Integer distance in pixels, or None if invalid format
+        """
+        # Try predefined gap types first
+        if gap_type in self.gap_types:
+            gap_def = self.gap_types[gap_type]
+            multiplier = gap_def.get('multiplier', 1)
+            distance = int(self.gap_unit_distance * multiplier)
+            return distance
+        
+        # Try parsing dynamic format: gap-{multiplier} or gap-{multiplier}-{hazard}
+        if gap_type.startswith('gap-'):
+            try:
+                parts = gap_type[4:].split('-')  # Remove 'gap-' prefix and split
+                multiplier = float(parts[0])
+                distance = int(self.gap_unit_distance * multiplier)
+                return distance
+            except (ValueError, IndexError):
+                pass
+        
+        print(f"Warning: Unknown gap type '{gap_type}'")
+        return None
+    
+    def get_gap_hazard(self, gap_type):
+        """
+        Get hazard type for a gap.
+        Supports format: 'gap-{multiplier}-{hazard}' (e.g., 'gap-2.0-lava', 'gap-1.75-acid')
+        
+        Args:
+            gap_type: String name of gap type
+        
+        Returns:
+            Hazard type string ('lava', 'acid', 'none') or None if no hazard specified
+        """
+        # Try parsing dynamic format: gap-{multiplier}-{hazard}
+        if gap_type.startswith('gap-'):
+            try:
+                parts = gap_type[4:].split('-')  # Remove 'gap-' prefix and split
+                if len(parts) >= 2:
+                    hazard = parts[1]  # Second part is hazard type
+                    if hazard in ['lava', 'acid', 'none']:
+                        return hazard if hazard != 'none' else None
+            except (ValueError, IndexError):
+                pass
+        
+        return None  # No hazard specified
+    
+    def list_gap_types(self):
+        """Get list of all available gap type names."""
+        return list(self.gap_types.keys())
+
+
+# Global bar type manager instance
+bar_type_manager = BarTypeManager()
+
+
+========================================
+FILE: ./managers/pattern_manager.py
+========================================
+
+"""
+Pattern loading and validation for obstacle generation.
+"""
+
+import json
+import os
+from game.config import GROUND_Y
+from managers.bar_type_manager import bar_type_manager
+
+
+class PatternManager:
+    """Manages loading of obstacle patterns.
+    Patterns are pre-validated by the pattern generator."""
+    
+    def __init__(self, patterns_dir="obstacle_patterns", difficulty="hard"):
+        self.patterns_dir = patterns_dir
+        self.difficulty = difficulty  # "easy", "medium", or "hard"
+        self.patterns = self._load_patterns()
+        print(f"Loaded {len(self.patterns)} obstacle patterns for difficulty: {difficulty}")
+    
+    def _load_patterns(self):
+        """Load obstacle patterns from JSON files matching the selected difficulty.
+        Patterns are pre-validated by the pattern generator, so no validation needed here."""
+        patterns = []
+        
+        if not os.path.exists(self.patterns_dir):
+            print(f"Patterns directory '{self.patterns_dir}' not found")
+            return patterns
+        
+        difficulty_suffix = f"_{self.difficulty}"  # e.g., "_easy", "_medium", "_hard"
+        
+        for filename in os.listdir(self.patterns_dir):
+            if filename.endswith('.json'):
+                # Only load patterns matching the selected difficulty
+                if not filename.endswith(f"{difficulty_suffix}.json"):
+                    continue
+                
+                filepath = os.path.join(self.patterns_dir, filename)
+                try:
+                    with open(filepath, 'r') as f:
+                        pattern_data = json.load(f)
+                        # Resolve bar_type references to actual dimensions
+                        pattern_data = self._resolve_bar_types(pattern_data)
+                        # Load pattern (pre-validated by generator)
+                        if 'obstacles' in pattern_data and isinstance(pattern_data['obstacles'], list):
+                            patterns.append(pattern_data)
+                            print(f"✓ Loaded pattern: {pattern_data.get('name', filename)}")
+                        else:
+                            print(f"✗ Invalid pattern format in {filename}")
+                except (json.JSONDecodeError, IOError) as e:
+                    print(f"✗ Failed to load pattern {filename}: {e}")
+        
+        return patterns
+    
+    def _resolve_bar_types(self, pattern_data):
+        """
+        Resolve bar_type and gap_type references to actual width/height/gap values.
+        Supports both legacy format (explicit width/height/gap_after) and new format (bar_type/gap_type).
+        Now also supports floating platforms with y_offset.
+        """
+        obstacles = pattern_data.get('obstacles', [])
+        resolved_obstacles = []
+        
+        for obs in obstacles:
+            resolved_obs = obs.copy()
+            
+            # Check if this obstacle uses bar_type reference
+            if 'bar_type' in obs:
+                bar_type = obs['bar_type']
+                dimensions = bar_type_manager.get_bar_dimensions(bar_type)
+                
+                if dimensions:
+                    # Handle both (width, height) and (width, height, y_offset) tuples
+                    if len(dimensions) == 3:
+                        width, height, y_offset = dimensions
+                        if 'y_offset' not in obs:
+                            resolved_obs['y_offset'] = y_offset
+                    else:
+                        width, height = dimensions
+                        
+                    # Only override if not explicitly set
+                    if 'width' not in obs:
+                        resolved_obs['width'] = width
+                    if 'height' not in obs:
+                        resolved_obs['height'] = height
+                else:
+                    # Bar type not found, use defaults
+                    if 'width' not in obs:
+                        resolved_obs['width'] = 30
+                    if 'height' not in obs:
+                        resolved_obs['height'] = 30
+            
+            # Check if this obstacle uses gap_type reference
+            if 'gap_type' in obs:
+                gap_type = obs['gap_type']
+                gap_distance = bar_type_manager.get_gap_distance(gap_type)
+                gap_hazard = bar_type_manager.get_gap_hazard(gap_type)
+                
+                if gap_distance is not None:
+                    # Only override if not explicitly set
+                    if 'gap_after' not in obs:
+                        resolved_obs['gap_after'] = gap_distance
+                else:
+                    # Gap type not found, use default
+                    if 'gap_after' not in obs:
+                        resolved_obs['gap_after'] = 200
+                
+                # Set gap_hazard if specified in gap_type
+                if gap_hazard is not None:
+                    if 'gap_hazard' not in obs:
+                        resolved_obs['gap_hazard'] = gap_hazard
+            
+            # Ensure width and height exist (for legacy patterns)
+            if 'width' not in resolved_obs:
+                resolved_obs['width'] = 30
+            if 'height' not in resolved_obs:
+                resolved_obs['height'] = 30
+            if 'y_offset' not in resolved_obs:
+                resolved_obs['y_offset'] = 0  # Default to ground
+            
+            resolved_obstacles.append(resolved_obs)
+        
+        pattern_data['obstacles'] = resolved_obstacles
+        return pattern_data
+    
+    def get_random_pattern(self):
+        """Get a random pattern from loaded patterns."""
+        import random
+        if self.patterns:
+            return random.choice(self.patterns)
+        return None
+    
+    def get_pattern_count(self):
+        """Get the number of loaded patterns."""
+        return len(self.patterns)
+
+
+
+========================================
+FILE: ./managers/score_manager.py
+========================================
+
+"""
+Score tracking and persistence management.
+"""
+
+import json
+import os
+
+
+class ScoreManager:
+    """Manages game scoring and high score persistence per player."""
+    
+    def __init__(self, player_name="Guest", save_file="data/save_data.json"):
+        self.save_file = save_file
+        self.player_name = player_name
+        self.distance = 0  # Distance traveled in pixels
+        self.score = 0  # Score based on distance
+        self.landing_bonus = 0  # Bonus points from successful landings
+        self.high_score = self.load_high_score()
+    
+    def load_high_score(self):
+        """Load high score for current player from JSON file."""
+        if os.path.exists(self.save_file):
+            try:
+                with open(self.save_file, 'r') as f:
+                    data = json.load(f)
+                    # Support new per-player format
+                    if 'players' in data:
+                        return data['players'].get(self.player_name, {}).get('high_score', 0)
+                    # Legacy format compatibility
+                    elif 'high_score' in data:
+                        return data.get('high_score', 0)
+            except (json.JSONDecodeError, IOError):
+                return 0
+        return 0
+    
+    def save_high_score(self):
+        """Save high score for current player to JSON file."""
+        try:
+            # Ensure data directory exists
+            import os
+            os.makedirs(os.path.dirname(self.save_file), exist_ok=True)
+            
+            # Load existing data
+            data = {'players': {}}
+            if os.path.exists(self.save_file):
+                try:
+                    with open(self.save_file, 'r') as f:
+                        existing_data = json.load(f)
+                        # Migrate old format if needed
+                        if 'players' in existing_data:
+                            data = existing_data
+                        elif 'high_score' in existing_data:
+                            # Migrate old single high score to Guest player
+                            data['players']['Guest'] = {'high_score': existing_data['high_score']}
+                except (json.JSONDecodeError, IOError):
+                    pass
+            
+            # Update current player's high score
+            if self.player_name not in data['players']:
+                data['players'][self.player_name] = {}
+            data['players'][self.player_name]['high_score'] = self.high_score
+            
+            # Save
+            with open(self.save_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            print(f"✓ Saved high score for {self.player_name}: {self.high_score}")
+        except IOError as e:
+            print(f"Failed to save high score: {e}")
+    
+    def get_all_players(self):
+        """Get list of all player names with scores."""
+        if os.path.exists(self.save_file):
+            try:
+                with open(self.save_file, 'r') as f:
+                    data = json.load(f)
+                    if 'players' in data:
+                        return [(name, info.get('high_score', 0)) 
+                                for name, info in data['players'].items()]
+                    elif 'high_score' in data:
+                        return [('Guest', data['high_score'])]
+            except (json.JSONDecodeError, IOError):
+                pass
+        return []
+    
+    def update_distance(self, pixels):
+        """Update distance traveled and calculate score."""
+        self.distance += pixels
+        self.score = (self.distance // 100) + self.landing_bonus  # 1 point per 100 pixels + landing bonuses
+    
+    def add_landing_bonus(self, combo_streak=0):
+        """Add bonus points for successful landing with combo multiplier.
+        Base bonus is 5 points, plus 1 point for each consecutive platform landing.
+        """
+        bonus = 5 + combo_streak  # 5 base + streak bonus
+        self.landing_bonus += bonus
+        self.score = (self.distance // 100) + self.landing_bonus
+        return bonus  # Return actual bonus awarded for UI display
+    
+    def check_and_save_high_score(self):
+        """Check if current score is a high score and save if it is.
+        Always saves the player to ensure they appear in the player list."""
+        is_new_high_score = False
+        if self.score > self.high_score:
+            self.high_score = self.score
+            is_new_high_score = True
+        
+        # Always save to ensure player is in the list, even with score 0
+        self.save_high_score()
+        return is_new_high_score
+    
+    def reset(self):
+        """Reset current game scores (keeps high score)."""
+        self.distance = 0
+        self.score = 0
+        self.landing_bonus = 0
+    
+    def get_score(self):
+        """Get current score."""
+        return self.score
+    
+    def get_high_score(self):
+        """Get high score."""
+        return self.high_score
+    
+    def get_distance(self):
+        """Get current distance."""
+        return self.distance
+
+
+========================================
+FILE: ./systems/__init__.py
+========================================
+
+"""System modules for game functionality."""
+
+
+========================================
+FILE: ./systems/input_handler.py
+========================================
+
+"""
+Input handling for game controls.
+"""
+
+import pygame
+
+
+class InputHandler:
+    """Handles keyboard and other input events."""
+    
+    def __init__(self):
+        self.quit_requested = False
+        self.jump_pressed = False
+        self.restart_pressed = False
+        self.pause_pressed = False
+        self.up_pressed = False
+        self.down_pressed = False
+        self.select_pressed = False
+    
+    def process_events(self):
+        """Process pygame events and update input states."""
+        # Reset single-frame events
+        self.jump_pressed = False
+        self.restart_pressed = False
+        self.pause_pressed = False
+        self.up_pressed = False
+        self.down_pressed = False
+        self.select_pressed = False
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.quit_requested = True
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    self.jump_pressed = True
+                    self.select_pressed = True  # Space also selects in menus
+                elif event.key == pygame.K_ESCAPE:
+                    self.pause_pressed = True  # ESC toggles pause, doesn't quit
+                elif event.key == pygame.K_r:
+                    self.restart_pressed = True
+                elif event.key == pygame.K_UP:
+                    self.up_pressed = True
+                elif event.key == pygame.K_DOWN:
+                    self.down_pressed = True
+    
+    def is_quit_requested(self):
+        """Check if quit was requested."""
+        return self.quit_requested
+    
+    def is_jump_pressed(self):
+        """Check if jump was pressed this frame."""
+        return self.jump_pressed
+    
+    def is_restart_pressed(self):
+        """Check if restart was pressed this frame."""
+        return self.restart_pressed
+    
+    def is_pause_pressed(self):
+        """Check if pause was pressed this frame."""
+        return self.pause_pressed
+    
+    def is_up_pressed(self):
+        """Check if up arrow was pressed this frame."""
+        return self.up_pressed
+    
+    def is_down_pressed(self):
+        """Check if down arrow was pressed this frame."""
+        return self.down_pressed
+    
+    def is_select_pressed(self):
+        """Check if select (space) was pressed this frame."""
+        return self.select_pressed
+
+
+========================================
+FILE: ./test_save.py
+========================================
+
+#!/usr/bin/env python3
+"""Test script to verify player save/load functionality"""
+
+from managers.score_manager import ScoreManager
+import os
+
+print("=== Testing Player Save/Load System ===\n")
+
+# Test 1: Load existing players
+print("Test 1: Loading existing players")
+sm = ScoreManager()
+players = sm.get_all_players()
+print(f"  Existing players: {players}\n")
+
+# Test 2: Create a new player and save a score
+print("Test 2: Creating new player 'Alice' with score 50")
+alice = ScoreManager(player_name="Alice")
+alice.distance = 5000  # 5000 pixels = 50 points
+alice.update_distance(0)  # Calculate score
+print(f"  Alice's score: {alice.score}")
+alice.check_and_save_high_score()
+print()
+
+# Test 3: Verify Alice was saved
+print("Test 3: Verifying Alice was saved")
+sm2 = ScoreManager()
+players = sm2.get_all_players()
+print(f"  All players now: {players}")
+print()
+
+# Test 4: Load Alice and beat her score
+print("Test 4: Loading Alice and beating her score")
+alice2 = ScoreManager(player_name="Alice")
+print(f"  Alice's loaded high score: {alice2.high_score}")
+alice2.distance = 10000  # 10000 pixels = 100 points
+alice2.update_distance(0)
+print(f"  Alice's new score: {alice2.score}")
+result = alice2.check_and_save_high_score()
+print(f"  New high score saved: {result}")
+print()
+
+# Test 5: Verify high score was updated
+print("Test 5: Verifying high score was updated")
+alice3 = ScoreManager(player_name="Alice")
+print(f"  Alice's high score after update: {alice3.high_score}")
+print()
+
+# Test 6: Landing bonus test
+print("Test 6: Testing landing bonus")
+bob = ScoreManager(player_name="Bob")
+bob.distance = 1000  # 10 points from distance
+bob.update_distance(0)
+print(f"  Bob's score (distance only): {bob.score}")
+bonus = bob.add_landing_bonus(combo_streak=3)  # 5 base + 3 combo = 8 points
+print(f"  Landing bonus awarded: {bonus}")
+print(f"  Bob's total score: {bob.score}")
+bob.check_and_save_high_score()
+print()
+
+# Test 7: Show final state
+print("Test 7: Final player list")
+sm_final = ScoreManager()
+final_players = sm_final.get_all_players()
+for name, score in final_players:
+    print(f"  {name}: {score}")
+
+print("\n=== All Tests Complete ===")
+
+# Test 8: Player with score 0 (dies immediately)
+print("\nBonus Test: New player with score 0")
+zero_player = ScoreManager(player_name="ZeroScore")
+# Don't add any points, just save
+zero_player.check_and_save_high_score()
+print(f"  Saved ZeroScore with score: {zero_player.score}")
+
+# Verify they're in the list
+sm_bonus = ScoreManager()
+bonus_players = sm_bonus.get_all_players()
+zero_found = any(name == "ZeroScore" for name, score in bonus_players)
+print(f"  ZeroScore in player list: {zero_found}")
+
