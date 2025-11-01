@@ -122,15 +122,15 @@ class StreakIndicator:
             
             # Different messages based on streak level
             if self.streak_count >= 10:
-                text = f"🔥 UNSTOPPABLE x{self.streak_count}! 🔥"
+                text = f"*** ONSTUITBAAR x{self.streak_count}! ***"
                 color = (255, 0, 255)  # Magenta
                 glow_color = (255, 100, 255)
             elif self.streak_count >= 5:
-                text = f"⚡ ON FIRE x{self.streak_count}! ⚡"
+                text = f">>> IN VUUR x{self.streak_count}! <<<"
                 color = (255, 100, 0)  # Orange
                 glow_color = (255, 150, 50)
             elif self.streak_count >= 3:
-                text = f"✨ STREAK x{self.streak_count}! ✨"
+                text = f"+++ REEKS x{self.streak_count}! +++"
                 color = (255, 200, 0)  # Gold
                 glow_color = (255, 230, 100)
             else:
@@ -194,10 +194,10 @@ class StreakBrokenIndicator:
             
             # Show the streak that was lost
             if self.broken_streak >= 5:
-                text = f"💔 STREAK LOST x{self.broken_streak}!"
+                text = f"[X] REEKS VERLOREN x{self.broken_streak}!"
                 color = (255, 50, 50)  # Red
             elif self.broken_streak >= 3:
-                text = f"Streak Lost x{self.broken_streak}"
+                text = f"Reeks Verloren x{self.broken_streak}"
                 color = (200, 100, 100)  # Light red
             else:
                 # Don't show for small streaks

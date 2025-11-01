@@ -36,27 +36,37 @@ class Game:
         # Import renderer here after pygame is fully initialized
         from .renderer import Renderer
         
-        # Set up borderless fullscreen window
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.NOFRAME)
+        # Set up display with performance optimizations
+        display_flags = pygame.NOFRAME
+        if VSYNC:
+            display_flags |= pygame.SCALED  # Use scaled mode for better VSync support
+        if HARDWARE_ACCEL:
+            display_flags |= pygame.HWSURFACE | pygame.DOUBLEBUF
+        
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), display_flags, vsync=1 if VSYNC else 0)
         pygame.display.set_caption(GAME_TITLE)
         self.clock = pygame.time.Clock()
         self.running = True
         self.game_over = False
         self.paused = False
-        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Switch Player, 3=Difficulty, 4=Profile
+        self.pause_menu_option = 0  # 0=Resume, 1=Restart, 2=Switch Player, 3=Switch Character, 4=Difficulty, 5=Profile
         self.game_over_menu_option = 0  # 0=Restart, 1=Switch Player, 2=Profile
         self.showing_profile = False  # New state for showing profile page
         self.difficulty = None  # Will be set by menu
         self.player_name = None  # Will be set by name selection
+        self.current_character = None  # Track current character
         
         # Show player name selection first
         self.player_name = self.show_name_selection()
+        
+        # Show character selection after player name
+        self.current_character = self.show_character_selection()
         
         # Show difficulty menu
         self.difficulty = self.show_difficulty_menu()
         
         # Initialize game systems with selected difficulty and player name
-        self.player = Player(PLAYER_START_X, GROUND_Y)
+        self.player = Player(PLAYER_START_X, GROUND_Y, character_name=self.current_character)
         self.score_manager = ScoreManager(player_name=self.player_name)
         self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty, score_manager=self.score_manager)
         self.renderer = Renderer(self.screen)
@@ -76,7 +86,7 @@ class Game:
         player_names = [name for name, _ in existing_players] if existing_players else []
         
         # Add "New Player" option
-        options = player_names + ["+ New Player"]
+        options = player_names + ["+ Nieuwe Speler"]
         selected = 0
         input_mode = False  # Are we typing a new name?
         new_name = ""
@@ -119,14 +129,14 @@ class Game:
             
             if temp_renderer.font_available:
                 title_font = _load_font(60, bold=True)
-                title_text = title_font.render("SELECT PLAYER", True, BLACK)
+                title_text = title_font.render("KIES SPELER", True, BLACK)
                 title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
                 self.screen.blit(title_text, title_rect)
                 
                 if input_mode:
                     # Show input box
                     prompt_font = _load_font(40)
-                    prompt_text = prompt_font.render("Enter your name:", True, BLACK)
+                    prompt_text = prompt_font.render("Voer je naam in:", True, BLACK)
                     prompt_rect = prompt_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
                     self.screen.blit(prompt_text, prompt_rect)
                     
@@ -143,7 +153,7 @@ class Game:
                     
                     # Instructions
                     hint_font = _load_font(24)
-                    hint_text = hint_font.render("Press ENTER to confirm, ESC to cancel", True, (100, 100, 100))
+                    hint_text = hint_font.render("Druk op ENTER om te bevestigen, ESC om te annuleren", True, (100, 100, 100))
                     hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
                     self.screen.blit(hint_text, hint_rect)
                 else:
@@ -155,7 +165,7 @@ class Game:
                         # Show high score for existing players
                         if i < len(player_names):
                             score = existing_players[i][1]
-                            text = f"{option} (Best: {score})"
+                            text = f"{option} (Beste: {score})"
                         else:
                             text = option
                         
@@ -172,19 +182,19 @@ class Game:
                                 (option_rect.left - 20, y_pos + 15)
                             ])
                     
-                    # Instructions
+                    # Instructions - moved to bottom
                     hint_font = _load_font(24)
-                    hint_text = hint_font.render("UP/DOWN to select, ENTER to confirm", True, (100, 100, 100))
-                    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
+                    hint_text = hint_font.render("OP/NEER om te kiezen, ENTER om te bevestigen", True, (100, 100, 100))
+                    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50))
                     self.screen.blit(hint_text, hint_rect)
             else:
                 # Fallback text rendering
-                temp_renderer._draw_simple_text("SELECT PLAYER", SCREEN_WIDTH // 2 - 120, 100, BLACK, 24)
+                temp_renderer._draw_simple_text("KIES SPELER", SCREEN_WIDTH // 2 - 120, 100, BLACK, 24)
                 
                 if input_mode:
-                    temp_renderer._draw_simple_text("Enter your name:", SCREEN_WIDTH // 2 - 120, 250, BLACK, 18)
+                    temp_renderer._draw_simple_text("Voer je naam in:", SCREEN_WIDTH // 2 - 120, 250, BLACK, 18)
                     temp_renderer._draw_simple_text(new_name + "|", SCREEN_WIDTH // 2 - 100, 320, BLACK, 20)
-                    temp_renderer._draw_simple_text("ENTER=confirm ESC=cancel", SCREEN_WIDTH // 2 - 140, 400, (100, 100, 100), 14)
+                    temp_renderer._draw_simple_text("ENTER=bevestigen ESC=annuleren", SCREEN_WIDTH // 2 - 140, 400, (100, 100, 100), 14)
                 else:
                     for i, option in enumerate(options):
                         y_pos = 220 + i * 50
@@ -196,7 +206,7 @@ class Game:
                         color = YELLOW if i == selected else BLACK
                         temp_renderer._draw_simple_text(text, SCREEN_WIDTH // 2 - 100, y_pos, color, 18)
                     
-                    temp_renderer._draw_simple_text("UP/DOWN ENTER", SCREEN_WIDTH // 2 - 100, 500, (100, 100, 100), 14)
+                    temp_renderer._draw_simple_text("OP/NEER ENTER", SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 50, (100, 100, 100), 14)
             
             pygame.display.flip()
             self.clock.tick(FPS)
@@ -232,15 +242,16 @@ class Game:
             # Title
             if temp_renderer.font_available:
                 title_font = _load_font(72, bold=True)
-                title_text = title_font.render("SELECT DIFFICULTY", True, BLACK)
+                title_text = title_font.render("KIES MOEILIJKHEID", True, BLACK)
                 title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
                 self.screen.blit(title_text, title_rect)
                 
                 # Options
                 option_font = _load_font(56, bold=True)
+                difficulty_labels = {"easy": "MAKKELIJK", "medium": "GEMIDDELD", "hard": "MOEILIJK"}
                 for i, difficulty in enumerate(difficulties):
                     color = YELLOW if i == selected else WHITE
-                    text = option_font.render(difficulty.upper(), True, color)
+                    text = option_font.render(difficulty_labels[difficulty], True, color)
                     rect = text.get_rect(center=(SCREEN_WIDTH // 2, 300 + i * 80))
                     self.screen.blit(text, rect)
                     
@@ -252,37 +263,38 @@ class Game:
                             (rect.left - 20, rect.centery + 15)
                         ])
                 
-                # Instructions
+                # Instructions - moved to bottom
                 inst_font = _load_font(36)
-                inst_text = inst_font.render("↑/↓ to select, ENTER to confirm", True, WHITE)
-                inst_rect = inst_text.get_rect(center=(SCREEN_WIDTH // 2, 550))
+                inst_text = inst_font.render("OP/NEER om te kiezen, ENTER om te bevestigen", True, WHITE)
+                inst_rect = inst_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 60))
                 self.screen.blit(inst_text, inst_rect)
                 
                 # Difficulty descriptions
                 desc_font = _load_font(32)
                 descriptions = {
-                    "easy": "Wider platforms (+25%)",
-                    "medium": "Balanced challenge (+15%)",
-                    "hard": "Original difficulty"
+                    "easy": "Bredere platforms (+25%)",
+                    "medium": "Uitdaging in balans (+15%)",
+                    "hard": "Originele moeilijkheid"
                 }
                 desc_text = desc_font.render(descriptions[difficulties[selected]], True, (180, 180, 180))
                 desc_rect = desc_text.get_rect(center=(SCREEN_WIDTH // 2, 500))
                 self.screen.blit(desc_text, desc_rect)
             else:
                 # Fallback rendering when fonts not available
-                temp_renderer._draw_simple_text("SELECT DIFFICULTY", SCREEN_WIDTH // 2 - 180, 150, BLACK, 32)
+                temp_renderer._draw_simple_text("KIES MOEILIJKHEID", SCREEN_WIDTH // 2 - 180, 150, BLACK, 32)
                 
                 # Options with simple text
+                difficulty_labels = {"easy": "MAKKELIJK", "medium": "GEMIDDELD", "hard": "MOEILIJK"}
                 descriptions = {
-                    "easy": "Wider platforms +25%",
-                    "medium": "Balanced challenge +15%",
-                    "hard": "Original difficulty"
+                    "easy": "Bredere platforms +25%",
+                    "medium": "Uitdaging in balans +15%",
+                    "hard": "Originele moeilijkheid"
                 }
                 
                 for i, difficulty in enumerate(difficulties):
                     color = YELLOW if i == selected else WHITE
                     y_pos = 300 + i * 80
-                    temp_renderer._draw_simple_text(difficulty.upper(), SCREEN_WIDTH // 2 - 60, y_pos, color, 24)
+                    temp_renderer._draw_simple_text(difficulty_labels[difficulty], SCREEN_WIDTH // 2 - 60, y_pos, color, 24)
                     
                     # Draw indicator
                     if i == selected:
@@ -292,8 +304,8 @@ class Game:
                             (SCREEN_WIDTH // 2 - 80, y_pos + 20)
                         ])
                 
-                # Instructions
-                temp_renderer._draw_simple_text("UP/DOWN to select  ENTER to confirm", SCREEN_WIDTH // 2 - 250, 550, WHITE, 18)
+                # Instructions - moved to bottom
+                temp_renderer._draw_simple_text("OP/NEER om te kiezen  ENTER om te bevestigen", SCREEN_WIDTH // 2 - 250, SCREEN_HEIGHT - 60, WHITE, 18)
                 
                 # Description for selected difficulty
                 temp_renderer._draw_simple_text(descriptions[difficulties[selected]], SCREEN_WIDTH // 2 - 150, 500, (180, 180, 180), 16)
@@ -302,6 +314,159 @@ class Game:
             self.clock.tick(FPS)
         
         return difficulties[selected]
+    
+    def show_character_selection(self):
+        """Show character selection menu with grid layout and return selected character name."""
+        from .renderer import Renderer
+        from .assets import asset_manager
+        
+        temp_renderer = Renderer(self.screen)
+        
+        # Get available characters
+        characters = asset_manager.get_available_characters()
+        
+        if not characters:
+            # No characters available, return None (use default)
+            return None
+        
+        # Use only characters, no default option
+        all_options = characters
+        
+        # Grid layout configuration
+        cols = 4  # 4 characters per row
+        rows = (len(all_options) + cols - 1) // cols  # Calculate needed rows
+        sprite_size = 90  # Larger size for character sprite in grid
+        
+        # Grid navigation - start with first character
+        selected_col = 0
+        selected_row = 0
+        
+        # Find current character in grid if set
+        if self.current_character and self.current_character in characters:
+            index = all_options.index(self.current_character)
+            selected_row = index // cols
+            selected_col = index % cols
+        
+        # Pre-load all character sprites at the correct size to avoid blur
+        character_sprites = {}
+        for char in characters:
+            # Load sprite at exact target size using asset_manager with size parameter
+            char_path = f"{ASSETS_DIR}/player-characters/{char}"
+            sprite = asset_manager.load_image(char_path, (sprite_size, sprite_size))
+            if sprite:
+                character_sprites[char] = sprite
+            else:
+                print(f"Warning: Failed to load {char}")
+        
+        menu_running = True
+        while menu_running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    # Return first character as default
+                    return characters[0] if characters else None
+                
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP or event.key == pygame.K_w:
+                        selected_row = (selected_row - 1) % rows
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        selected_row = (selected_row + 1) % rows
+                    elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                        selected_col = (selected_col - 1) % cols
+                    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                        selected_col = (selected_col + 1) % cols
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                        menu_running = False
+                    elif event.key == pygame.K_ESCAPE:
+                        # Return first character as default on cancel
+                        return characters[0] if characters else None
+            
+            # Calculate selected index
+            selected_index = selected_row * cols + selected_col
+            # Wrap around if we're beyond the last option
+            if selected_index >= len(all_options):
+                selected_index = len(all_options) - 1
+                selected_row = selected_index // cols
+                selected_col = selected_index % cols
+            
+            # Draw menu
+            self.screen.fill(SKY_BLUE)
+            
+            if temp_renderer.font_available:
+                # Title
+                title_font = _load_font(64, bold=True)
+                title_text = title_font.render("KIES JE KARAKTER", True, BLACK)
+                title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
+                self.screen.blit(title_text, title_rect)
+                
+                # Grid layout - adjusted for larger sprites
+                grid_start_x = 280
+                grid_start_y = 140
+                cell_width = 200
+                cell_height = 170  # More height for larger sprites
+                # sprite_size is defined earlier (90px)
+                
+                for i, char_option in enumerate(all_options):
+                    row = i // cols
+                    col = i % cols
+                    
+                    # Calculate cell position
+                    x = grid_start_x + col * cell_width
+                    y = grid_start_y + row * cell_height
+                    
+                    # Check if this cell is selected
+                    is_selected = (row == selected_row and col == selected_col)
+                    
+                    # Draw cell background
+                    cell_rect = pygame.Rect(x, y, cell_width - 20, cell_height - 20)
+                    if is_selected:
+                        # Selected cell - bright background with thick border
+                        pygame.draw.rect(self.screen, (255, 240, 200), cell_rect, border_radius=15)
+                        pygame.draw.rect(self.screen, HEART_RED, cell_rect, 5, border_radius=15)
+                    else:
+                        # Normal cell - subtle background
+                        pygame.draw.rect(self.screen, (255, 255, 255, 150), cell_rect, border_radius=10)
+                        pygame.draw.rect(self.screen, (200, 200, 200), cell_rect, 2, border_radius=10)
+                    
+                    # Draw character sprite - already loaded at correct size, no scaling needed!
+                    # Center sprite vertically in cell
+                    sprite_y = y + (cell_height - 20 - sprite_size) // 2
+                    if char_option in character_sprites:
+                        sprite = character_sprites[char_option]
+                        sprite_x = x + (cell_width - 20 - sprite_size) // 2
+                        self.screen.blit(sprite, (sprite_x, sprite_y))
+                
+                # Instructions
+                inst_font = _load_font(26)
+                inst_text = inst_font.render("PIJLTJESTOETSEN om te kiezen, ENTER om te bevestigen, ESC om te annuleren", True, WHITE)
+                inst_rect = inst_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
+                self.screen.blit(inst_text, inst_rect)
+            else:
+                # Fallback rendering when fonts not available
+                temp_renderer._draw_simple_text("KIES KARAKTER", SCREEN_WIDTH // 2 - 150, 50, BLACK, 32)
+                
+                # Simple grid - smaller cells
+                for i, char_option in enumerate(all_options[:13]):  # All options in fallback
+                    row = i // cols
+                    col = i % cols
+                    x = 280 + col * 200
+                    y = 140 + row * 170
+                    
+                    is_selected = (row == selected_row and col == selected_col)
+                    color = YELLOW if is_selected else BLACK
+                    
+                    display_text = char_option.replace(".svg", "")[:10]
+                    
+                    temp_renderer._draw_simple_text(display_text, x, y, color, 16)
+                
+                temp_renderer._draw_simple_text("PIJLTJES om te kiezen  ENTER bevestig", SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT - 40, WHITE, 14)
+            
+            pygame.display.flip()
+            self.clock.tick(FPS)
+        
+        # Return selected character
+        selected_char = all_options[selected_index]
+        return selected_char
         
     def handle_events(self):
         """Process input events."""
@@ -320,9 +485,9 @@ class Game:
         if self.paused:
             # Navigate pause menu
             if self.input_handler.is_up_pressed():
-                self.pause_menu_option = (self.pause_menu_option - 1) % 5  # 5 options now
+                self.pause_menu_option = (self.pause_menu_option - 1) % 6  # 6 options now
             elif self.input_handler.is_down_pressed():
-                self.pause_menu_option = (self.pause_menu_option + 1) % 5  # 5 options now
+                self.pause_menu_option = (self.pause_menu_option + 1) % 6  # 6 options now
             elif self.input_handler.is_select_pressed():
                 self.handle_pause_menu_selection()
         elif not self.game_over:
@@ -368,11 +533,19 @@ class Game:
             self.player_name = self.show_name_selection()
             self.score_manager = ScoreManager(player_name=self.player_name)
             self.reset_game()
-        elif self.pause_menu_option == 3:  # Select Difficulty
+        elif self.pause_menu_option == 3:  # Switch Character
+            selected_character = self.show_character_selection()
+            if selected_character != self.current_character:
+                self.current_character = selected_character
+                # Update current player's character without resetting game
+                self.player.set_character(selected_character)
+            # Return to pause menu
+            self.paused = True
+        elif self.pause_menu_option == 4:  # Select Difficulty
             self.paused = False
             self.difficulty = self.show_difficulty_menu()
             self.reset_game()
-        elif self.pause_menu_option == 4:  # Profile
+        elif self.pause_menu_option == 5:  # Profile
             self.showing_profile = True
 
 
@@ -382,7 +555,7 @@ class Game:
         from .renderer import Renderer
         
         self.game_over = False
-        self.player = Player(PLAYER_START_X, GROUND_Y)
+        self.player = Player(PLAYER_START_X, GROUND_Y, character_name=self.current_character)
         self.score_manager.reset()
         self.obstacle_generator = ObstacleGenerator(difficulty=self.difficulty, score_manager=self.score_manager)
         self.renderer = Renderer(self.screen)
@@ -441,6 +614,7 @@ class Game:
         high_score = self.score_manager.get_high_score()
         
         self.renderer.draw_background(score)
+        self.renderer.draw_midground()  # Midground decorations with parallax (between bg and game)
         self.renderer.draw_ground()  # Draw ground first
         self.obstacle_generator.draw(self.screen)  # Then obstacles (including lava) on top
         self.player.draw(self.screen)  # Player on top of everything

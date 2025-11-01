@@ -33,6 +33,7 @@ class Obstacle:
             self.y_offset = 0  # Sits on ground
             self.custom_sprite = None
             self.hazard_texture = asset_manager.get_hazard_texture(hazard_type)
+            self.obstacle_pattern = None
         else:
             # Normal obstacles
             self.width = width
@@ -41,6 +42,17 @@ class Obstacle:
             self.y = GROUND_Y + PLAYER_SIZE - height - y_offset
             self.custom_sprite = asset_manager.get_obstacle_sprite(self.width, self.height)
             self.hazard_texture = None
+            # Load pattern for tiling
+            self.obstacle_pattern = asset_manager.get_obstacle_pattern()
+            # Random offset into the pattern for variety
+            if self.obstacle_pattern:
+                pattern_width = self.obstacle_pattern.get_width()
+                pattern_height = self.obstacle_pattern.get_height()
+                self.pattern_offset_x = random.randint(0, pattern_width - 1) if pattern_width > 0 else 0
+                self.pattern_offset_y = random.randint(0, pattern_height - 1) if pattern_height > 0 else 0
+            else:
+                self.pattern_offset_x = 0
+                self.pattern_offset_y = 0
         
         self.passed = False
         
@@ -76,12 +88,12 @@ class Obstacle:
         if self.is_killzone:
             self._draw_hazard_bar(screen)
         elif self.custom_sprite:
-            screen.blit(self.custom_sprite, (self.x, self.y))
+            self._draw_custom_sprite(screen)
         else:
             self._draw_procedural(screen)
     
     def _draw_procedural(self, screen):
-        """Draw using procedural generation (gradient purple block) with landing effects."""
+        """Draw using pattern fill or procedural generation (gradient purple block) with landing effects."""
         # Calculate squish dimensions
         squish_factor = 1 - (self.landing_squish * 0.4)  # Max 10% height reduction
         squish_height = int(self.height * squish_factor)
@@ -97,11 +109,41 @@ class Obstacle:
                 pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
                 screen.blit(glow_surface, (self.x - glow_size, self.y + squish_y_offset - glow_size))
         
-        # Draw cute obstacle with gradient effect
-        for i in range(squish_height):
-            color_intensity = 216 - (i * 20 // squish_height)
-            color = (color_intensity, 191 - (i * 10 // squish_height), 216)
-            pygame.draw.rect(screen, color, (self.x, self.y + squish_y_offset + i, self.width, 1))
+        # Use pattern if available, otherwise use gradient
+        if self.obstacle_pattern:
+            # Create a surface for the obstacle with the pattern tiled
+            obstacle_surface = pygame.Surface((self.width, squish_height))
+            
+            pattern_width = self.obstacle_pattern.get_width()
+            pattern_height = self.obstacle_pattern.get_height()
+            
+            # Tile the pattern across the obstacle with random offset
+            # Start tiling from the random offset position
+            start_y = -self.pattern_offset_y
+            for tile_y in range(start_y, squish_height, pattern_height):
+                start_x = -self.pattern_offset_x
+                for tile_x in range(start_x, self.width, pattern_width):
+                    # Calculate source rectangle from pattern (what part to copy)
+                    src_x = max(0, -tile_x)
+                    src_y = max(0, -tile_y)
+                    src_width = min(pattern_width - src_x, self.width - max(0, tile_x))
+                    src_height = min(pattern_height - src_y, squish_height - max(0, tile_y))
+                    
+                    # Calculate destination position on obstacle surface
+                    dest_x = max(0, tile_x)
+                    dest_y = max(0, tile_y)
+                    
+                    if src_width > 0 and src_height > 0:
+                        src_rect = pygame.Rect(src_x, src_y, src_width, src_height)
+                        obstacle_surface.blit(self.obstacle_pattern, (dest_x, dest_y), src_rect)
+            
+            screen.blit(obstacle_surface, (self.x, self.y + squish_y_offset))
+        else:
+            # Fallback: Draw cute obstacle with gradient effect
+            for i in range(squish_height):
+                color_intensity = 216 - (i * 20 // squish_height)
+                color = (color_intensity, 191 - (i * 10 // squish_height), 216)
+                pygame.draw.rect(screen, color, (self.x, self.y + squish_y_offset + i, self.width, 1))
         
         # Blink effect - brighter color
         if self.landing_blink > 0 and self.landing_blink % 2 == 0:
@@ -117,6 +159,36 @@ class Obstacle:
             star_x = self.x + random.randint(5, max(6, self.width - 5))
             star_y = self.y + squish_y_offset + random.randint(5, max(6, squish_height - 5))
             pygame.draw.circle(screen, YELLOW, (star_x, star_y), 2)
+    
+    def _draw_custom_sprite(self, screen):
+        """Draw custom sprite with landing effects."""
+        # Calculate squish dimensions
+        squish_factor = 1 - (self.landing_squish * 0.4)  # Max 40% squish reduction
+        squish_height = int(self.height * squish_factor)
+        squish_y_offset = self.height - squish_height
+        
+        # Draw glow effect if active
+        if self.landing_glow > 20:
+            glow_size = 8
+            for i in range(3):
+                glow_alpha = int(self.landing_glow * (1 - i * 0.3))
+                glow_surface = pygame.Surface((self.width + glow_size*2, squish_height + glow_size*2), pygame.SRCALPHA)
+                color = (255, 255, 100, glow_alpha)  # Yellow glow
+                pygame.draw.rect(glow_surface, color, glow_surface.get_rect(), border_radius=8)
+                screen.blit(glow_surface, (self.x - glow_size, self.y + squish_y_offset - glow_size))
+        
+        # Scale sprite to squish dimensions
+        if squish_factor < 0.99:  # Only scale if there's noticeable squish
+            squished_sprite = pygame.transform.scale(self.custom_sprite, (self.width, squish_height))
+            screen.blit(squished_sprite, (self.x, self.y + squish_y_offset))
+        else:
+            screen.blit(self.custom_sprite, (self.x, self.y))
+        
+        # Blink effect - brighter overlay
+        if self.landing_blink > 0 and self.landing_blink % 2 == 0:
+            blink_surface = pygame.Surface((self.width, squish_height), pygame.SRCALPHA)
+            blink_surface.fill((255, 255, 150, 100))  # Yellow tint
+            screen.blit(blink_surface, (self.x, self.y + squish_y_offset))
     
     def _draw_hazard_bar(self, screen):
         """Draw low hazard bar (15px tall) that sits above the grass."""

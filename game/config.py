@@ -8,6 +8,11 @@ SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 900
 FPS = 60
 
+# Performance settings
+ENABLE_DIRTY_RECTS = False  # Experimental: only update changed regions
+VSYNC = True  # Enable VSync for smoother frame pacing
+HARDWARE_ACCEL = True  # Use hardware acceleration if available
+
 # Colors - cute pastel palette
 SKY_BLUE = (173, 216, 230)
 SKY_LIGHT = (223, 240, 250)

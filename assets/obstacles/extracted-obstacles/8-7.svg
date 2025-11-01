@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="http://www.w3.org/2000/svg" xmlns:serif="http://www.serif.com/" height="100%" style="fill-rule:evenodd;clip-rule:evenodd;" version="1.1" viewBox="1002.86 740.0 114.286 100.0" width="100%">
+    <g>
+        <svg:rect x="1002.86" y="740" width="114.286" height="100" style="fill:rgb(255,126,121);" />
+        <svg:g transform="matrix(0.254917,0.500228,-0.500228,0.254917,1003.8,553.827)">
+            <svg:path d="M399.589,126.828C399.589,126.828 399.055,126.499 398.105,125.894C390.618,121.123 357.273,99.147 355.424,85.069C353.341,69.205 368.841,73.405 368.841,73.405C368.841,73.405 354.804,57.699 359.498,46.315C364.192,34.93 380.98,47.417 381.349,47.948C381.718,48.479 383.266,21.967 397.47,23.92C411.674,25.873 413.845,49.806 413.845,49.806C413.845,49.806 418.553,39.198 430.524,43.224C442.494,47.25 442.454,103.925 442.454,103.925L399.589,126.828Z" style="fill:rgb(158,207,187);fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M453.844,190.701C453.844,190.701 438.78,187.509 429.164,178.179C419.548,168.849 403.112,172.378 391.878,149.746C380.644,127.114 396.786,114.085 426.696,102.001C456.606,89.916 468.223,113.857 465.836,130.46C463.449,147.063 470.309,152.797 463.461,164.101C456.613,175.406 450.717,183.166 453.844,190.701Z" style="fill:rgb(195,82,78);fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M401.688,73.577C401.688,73.577 400.318,64.034 410.484,62.481C420.65,60.928 420.697,72.166 420.697,72.166" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M415.346,170.748C415.346,170.748 420.417,164.744 428.493,161.632" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M419.568,159.057C419.568,159.057 425.595,154.706 432.757,154.738" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M453.44,155.391C453.44,155.391 460.792,153.49 466.351,156.605" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M443.863,168.695C443.863,168.695 453.609,165.109 460.044,169.652" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M434.928,182.743C434.928,182.743 436.458,176.207 448.665,173.218" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M423.605,117.1C423.605,117.1 433.681,110.007 444.38,110.678" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M435.783,108.71C435.783,108.71 442.59,104.893 450.502,106.378" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M452.62,202.607C452.62,202.607 458.208,196.371 453.843,190.701C453.843,190.701 458.749,193.597 458.209,199.684C457.669,205.77 462.397,209.156 462.397,209.156" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:g>
+                <svg:path d="M418.491,138.786C419.657,140.468 419.963,142.275 418.644,143.19C417.325,144.105 415.74,143.185 414.573,141.503C413.407,139.821 413.101,138.014 414.42,137.099C415.739,136.184 417.325,137.104 418.491,138.786Z" style="fill:rgb(84,57,43);fill-rule:nonzero;" />
+                <svg:path d="M441.227,123.021C442.393,124.703 442.699,126.51 441.38,127.425C440.061,128.34 438.476,127.42 437.309,125.738C436.143,124.056 435.837,122.249 437.156,121.334C438.475,120.419 440.06,121.339 441.227,123.021Z" style="fill:rgb(84,57,43);fill-rule:nonzero;" />
+                <svg:path d="M426.261,137.884C429.801,140.254 435.212,136.502 434.234,132.356" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+                <svg:path d="M415.071,145.666C416.276,147.405 415.418,150.087 413.154,151.657C410.89,153.227 408.077,153.09 406.872,151.352C405.667,149.613 406.525,146.931 408.789,145.361C411.053,143.791 413.866,143.928 415.071,145.666Z" style="fill:rgb(255,136,185);fill-rule:nonzero;" />
+                <svg:path d="M453.152,119.262C454.357,121.001 453.499,123.683 451.235,125.253C448.971,126.823 446.158,126.686 444.953,124.948C443.747,123.209 444.606,120.527 446.87,118.957C449.133,117.387 451.946,117.524 453.152,119.262Z" style="fill:rgb(255,136,185);fill-rule:nonzero;" />
+            </svg:g>
+            <svg:g opacity="0.3">
+                <svg:path d="M410.798,114.277C396.143,129.163 395.586,136.338 401.066,155.946L401.087,156.033C401.151,156.26 400.811,156.419 400.684,156.21L398.894,153.569C392.071,143.012 390.654,130.553 400.106,121.064C403.1,117.985 406.685,115.537 410.621,113.848C410.905,113.771 411.049,114.09 410.798,114.277Z" style="fill:white;fill-rule:nonzero;" />
+            </svg:g>
+            <svg:g opacity="0.3">
+                <svg:path d="M392.405,116.465C383.909,112.988 376.986,107.347 370.857,100.709C366.816,96.002 362.321,90.392 361.414,83.807C360.971,81.252 362.448,78.073 365.371,78.08C366.829,78.025 367.962,78.456 369.064,78.985C369.177,79.039 369.224,79.174 369.171,79.287C369.13,79.373 369.042,79.421 368.953,79.415C367.887,79.351 366.79,79.333 365.804,79.63C357.633,82.227 380.341,103.854 383.308,107.053C386.406,110.11 389.536,113.144 392.714,116.118C392.889,116.268 392.705,116.595 392.479,116.494L392.405,116.465Z" style="fill:white;fill-rule:nonzero;" />
+            </svg:g>
+            <svg:g opacity="0.3">
+                <svg:path d="M371.914,69.646C365.615,66.001 360.197,57.996 361.46,50.585C361.961,47.599 364.68,45.082 367.701,44.977C372.094,44.88 375.707,47.709 378.053,51.053C378.173,51.226 377.978,51.462 377.787,51.375C376.631,50.883 375.034,50.221 373.861,49.837C362.517,45.835 365.636,55.165 368.499,61.854C369.655,64.419 370.937,66.944 372.31,69.401C372.422,69.579 372.196,69.814 372.014,69.7L371.914,69.646Z" style="fill:white;fill-rule:nonzero;" />
+            </svg:g>
+            <svg:g opacity="0.3">
+                <svg:path d="M390.816,47.732C384.091,41.943 387.906,28.695 397.136,28.639C397.285,28.634 397.505,28.654 397.494,28.857C397.493,28.91 397.471,28.958 397.437,28.994C397.136,29.32 396.41,30.063 396.124,30.374C392.688,34.439 391.329,39.875 391.247,45.12C391.21,45.969 391.217,46.829 391.276,47.668C391.261,47.935 391.002,47.953 390.816,47.732Z" style="fill:white;fill-rule:nonzero;" />
+            </svg:g>
+            <svg:g opacity="0.3">
+                <svg:path d="M408.898,75.68C401.799,72.834 406.883,62.245 413.393,66.329C413.495,66.39 413.499,66.544 413.403,66.612C410.352,68.502 409.153,72.144 409.356,75.596C409.34,75.875 409.056,75.757 408.898,75.68Z" style="fill:white;fill-rule:nonzero;" />
+            </svg:g>
+            <svg:g opacity="0.3">
+                <svg:path d="M418.711,56.539C414.327,50.892 421.712,43.693 427.225,48.226C427.327,48.3 427.312,48.466 427.199,48.52C424.543,49.783 422.246,51.69 420.608,54.136C420.062,54.939 419.554,55.797 419.155,56.676C419.003,56.921 418.815,56.7 418.711,56.539Z" style="fill:white;fill-rule:nonzero;" />
+            </svg:g>
+            <svg:path d="M391.788,107.299C391.788,107.299 381.462,95.114 396.858,90.536" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M378.47,62.527C378.47,62.527 380.875,49.119 395.274,57.529" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M423.165,87.082C423.165,87.082 432.59,84.045 434.878,94.448" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+            <svg:path d="M389.906,145.091C389.906,145.091 399.039,129.889 412.252,122.911" style="fill:none;fill-rule:nonzero;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" />
+        </svg:g>
+    </g>
+</svg>

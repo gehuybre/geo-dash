@@ -68,7 +68,7 @@ class ScorePopup:
 class Player:
     """Player character with physics and rendering."""
     
-    def __init__(self, x, y):
+    def __init__(self, x, y, character_name=None):
         # Import asset_manager here to avoid circular import issues
         from .assets import asset_manager
         
@@ -89,8 +89,22 @@ class Player:
         self.last_landed_on_ground = True  # Track if last landing was on ground
         self.current_obstacle = None  # Track which obstacle player is currently on to prevent duplicate bonuses
         
+        # Store character name for switching
+        self.character_name = character_name
+        
         # Try to load custom sprite
-        self.custom_sprite = asset_manager.get_player_sprite()
+        self.custom_sprite = asset_manager.get_player_sprite(character_name)
+    
+    def set_character(self, character_name):
+        """
+        Change player character sprite.
+        
+        Args:
+            character_name: Name of the character file (e.g., 'player-cube-blue.svg')
+        """
+        from .assets import asset_manager
+        self.character_name = character_name
+        self.custom_sprite = asset_manager.get_player_sprite(character_name)
         
     def jump(self):
         """Make the player jump (supports double jump)."""
